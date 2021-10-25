@@ -123,7 +123,15 @@ class phoromatic extends pts_module_interface
 		$server_count = 0;
 		foreach($archived_servers as $archived_server)
 		{
-			$response = pts_network::http_get_contents('http://' . $archived_server['ip'] . ':' . $archived_server['http_port'] . '/server.php?phoromatic_info');
+			if($archived_server['http_port'] == 443)
+			{
+				$protocol = 'https://';
+			}
+			else
+			{
+				$protocol = 'http://';
+			}
+			$response = pts_network::http_get_contents($protocol . $archived_server['ip'] . ':' . $archived_server['http_port'] . '/server.php?phoromatic_info');
 
 			if(!empty($response))
 			{
@@ -151,7 +159,7 @@ class phoromatic extends pts_module_interface
 
 						// Provide some other server info via HTTP
 
-						$repo = pts_network::http_get_contents('http://' . $archived_server['ip'] . ':' . $archived_server['http_port'] . '/download-cache.php?repo');
+						$repo = pts_network::http_get_contents($protocol . $archived_server['ip'] . ':' . $archived_server['http_port'] . '/download-cache.php?repo');
 						echo 'DOWNLOAD CACHE: ';
 						if(!empty($repo))
 						{
@@ -174,7 +182,7 @@ class phoromatic extends pts_module_interface
 
 					echo PHP_EOL;
 
-					$repo = pts_network::http_get_contents('http://' . $archived_server['ip'] . ':' . $archived_server['http_port'] . '/openbenchmarking-cache.php?repos');
+					$repo = pts_network::http_get_contents($protocol . $archived_server['ip'] . ':' . $archived_server['http_port'] . '/openbenchmarking-cache.php?repos');
 					echo 'SUPPORTED OPENBENCHMARKING.ORG REPOSITORIES:' . PHP_EOL;
 					if(!empty($repo))
 					{
@@ -292,7 +300,17 @@ class phoromatic extends pts_module_interface
 		$to_post['n'] = phodevi::read_property('system', 'hostname');
 		$to_post['pp'] = json_encode(phodevi::read_all_properties());
 		$to_post['msi'] = PTS_MACHINE_SELF_ID;
-		return pts_network::http_upload_via_post('http://' . $server_address . ':' . $server_http_port .  '/phoromatic.php', $to_post, false);
+		
+		if($server_http_port == 443)
+			{
+				$protocol = 'https://';
+			}
+			else
+			{
+				$protocol = 'http://';
+			}
+
+		return pts_network::http_upload_via_post($protocol . $server_address . ':' . $server_http_port .  '/phoromatic.php', $to_post, false);
 	}
 	protected static function update_system_status($current_task, $estimated_time_remaining = 0, $percent_complete = 0, $for_schedule = null, $estimate_to_next_comm = 0)
 	{
