@@ -3,7 +3,7 @@
 	<ExternalDependencies>
 		<Information>
 			<Name>NetBSD</Name>
-			<PackageManager>pkg_add</PackageManager>
+			<PackageManager>pkgin</PackageManager>
 		</Information>
 		<Package>
 			<GenericName>32bit-compatibility</GenericName>
@@ -83,7 +83,7 @@
 		</Package>
 		<Package>
 			<GenericName>java</GenericName>
-			<PackageName>openjdk</PackageName>
+			<PackageName>openjdk11</PackageName>
 			<FileCheck>/usr/pkg/openjdk/bin/java</FileCheck>
 		</Package>
 		<Package>
@@ -138,7 +138,7 @@
 		</Package>
 		<Package>
 			<GenericName>libtool</GenericName>
-			<PackageName>libtool-base</PackageName>
+			<PackageName>libtool</PackageName>
 			<FileCheck>/usr/pkg/bin/libtool</FileCheck>
 		</Package>
 		<Package>
@@ -250,7 +250,7 @@
 		</Package>
 		<Package>
 			<GenericName>fftw3-development</GenericName>
-			<PackageName>fftw3</PackageName>
+			<PackageName>fftw</PackageName>
 		</Package>
 		<Package>
 			<GenericName>libevent</GenericName>

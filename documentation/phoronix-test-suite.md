@@ -4,7 +4,7 @@
 ## Overview
 The Phoronix Test Suite is the most comprehensive testing and benchmarking platform available for Linux, Solaris, macOS, Windows, and BSD operating systems. The Phoronix Test Suite allows for carrying out tests in a fully automated manner from test installation to execution and reporting. All tests are meant to be easily reproducible, easy-to-use, and support fully automated execution. The Phoronix Test Suite is open-source under the GNU GPLv3 license and is developed by Phoronix Media in cooperation with partners. Version 1.0 of the Phoronix Test Suite was publicly released in 2008.
 
-The Phoronix Test Suite client itself is a test framework for providing seamless execution of test profiles and test suites. There are more than 600 tests available by default, which are transparently available via [OpenBenchmarking.org](https://openbenchmarking.org/) integration. Of these default test profiles there is a range of sub-systems that can be tested and a range of hardware from mobile devices to desktops and worksrtations/servers. New tests can be easily introduced via the Phoronix Test Suite's extensible test architecture, with test profiles consisting of XML files and shell scripts. Test profiles can produce a quantitative result or other qualitative/abstract results like image quality comparisons and pass/fail. Using Phoronix Test Suite modules, other data can also be automatically collected at run-time such as the system power consumption, disk usage, and other software/hardware sensors. Test suites contain references to test profiles to execute as part of a set or can also reference other test suites. Test suites are defined via an XML schema.
+The Phoronix Test Suite client itself is an automated test framework for providing seamless execution of test profiles and test suites. There are more than 650 tests available by default, which are transparently available via [OpenBenchmarking.org](https://openbenchmarking.org/) integration. Of these default test profiles there is a range of sub-systems that can be tested and a range of hardware from mobile devices to desktops and workstations/servers. New tests can be easily introduced via the Phoronix Test Suite's extensible test architecture, with test profiles consisting of XML files and shell scripts. Test profiles can produce a quantitative result or other qualitative/abstract results like image quality comparisons and pass/fail. Using Phoronix Test Suite modules, other data can also be automatically collected at run-time such as the system power consumption, disk usage, and other software/hardware sensors. Test suites contain references to test profiles to execute as part of a set or can also reference other test suites. Test suites are defined via an XML schema.
 
 Running the Phoronix Test Suite for the first time can be as simple as issuing a command such as *phoronix-test-suite benchmark c-ray* , which would proceed to install a simple CPU test, execute the test, and report the results. Along with the results, the system's hardware/software information is collected in a detailed manner, relevant system logs, and other important system attributes such as compiler flags and system state. Users can optionally upload their results to OpenBenchmarking.org for sharing results with others, comparing results against other systems, and to carry out further analysis.
 
@@ -22,6 +22,8 @@ Phoromatic is a remote management system for the Phoronix Test Suite that allows
 
 Phoromatic is an add-on to the Phoronix Test Suite that's primarily intended for enterprise users when facilitating tests across a wide-spectrum of hardware within a test lab or when needing to carry out tests on a routine basis.
 
+A Phoromatic server can be started using *phoronix-test-suite start-phoromatic-server* (or the included systemd phoromatic-server service file). Clients can connect to the server using the *phoronix-test-suite phoromatic.connect* command as well as a phoromatic-client systemd service. See the Phoromatic section of the documentation for more information on setting up Phoromatic.
+
 
 # User Options
 The following options are currently supported by the Phoronix Test Suite client. A list of available options can also be found by running *phoronix-test-suite help.*
@@ -30,9 +32,6 @@ The following options are currently supported by the Phoronix Test Suite client.
 ---
 
 ## System
-#### diagnostics
-This option will print information that is useful to developers when debugging problems with the Phoronix Test Suite and/or test profiles and test suites.
-
 #### interactive
 A simple text-driven interactive interface to the Phoronix Test Suite.
 
@@ -80,7 +79,7 @@ This option will provide estimates for test install/setup time length.
 This option will provide estimates for test run-time / length.
 
 #### finish-run  [Test Result]
-This option can be used if a test run had not properly finished running all tests within a saved results file. Using this option when specifying a saved results file where all tests had not completed will attempt to finish testing on the remaining tests where there are missing results.
+This option can be used if a test run had not properly finished running all tests within a saved results file. Using this option when specifying a saved results file where all tests had not completed will attempt to finish / resume testing on the remaining tests where there are missing results to be completed.
 
 #### run  [Test | Suite | OpenBenchmarking ID | Test Result]  ...
 This option will run the selected test(s).
@@ -137,6 +136,12 @@ This option and its arguments pre-set the Phoronix Test Suite batch run mode wit
 #### clone-result  [OpenBenchmarking ID]  ...
 This option will download a local copy of a file that was saved to OpenBenchmarking.org, as long as a valid public ID is supplied.
 
+#### dump-suites-to-git
+This option will create a Git repository of OpenBenchmarking.org test suites.
+
+#### dump-tests-to-git
+This option will create a Git repository of OpenBenchmarking.org test profiles.
+
 #### enable-repo
 This option is used if wanting to add a new OpenBenchmarking.org account/repository to your system for enabling third-party/unofficial test profiles and test suites.
 
@@ -156,7 +161,7 @@ This option will list recent changes to test profiles of enabled OpenBenchmarkin
 This option is used for controlling your Phoronix Test Suite client options for OpenBechmarking.org and syncing the client to your account.
 
 #### openbenchmarking-refresh
-This option is used for refreshing the stored OpenBenchmarking.org repostory information and other data. The Phoronix Test Suite will automatically refresh this data every three days or when other thresholds are exceeded, but this command can be used to manually refresh/updates the data.
+This option is used for refreshing the stored OpenBenchmarking.org repository information and other data. The Phoronix Test Suite will automatically refresh this data every three days or when other thresholds are exceeded, but this command can be used to manually refresh/updates the data.
 
 #### openbenchmarking-repositories
 This option will list the OpenBenchmarking.org repositories currently linked to this Phoronix Test Suite client instance.
@@ -178,9 +183,6 @@ This option can be used for uploading a test suite to your account on OpenBenchm
 
 
 ## Information
-#### check-tests  [Test]
-This option will perform a check on one or more test profiles to determine if there have been any vendor changes to the filename, filesize, url location, md5 and sha256 checksums.
-
 #### info  [Test | Suite | OpenBenchmarking ID | Test Result]
 This option will show details about the supplied test, suite, virtual suite, or result file.
 
@@ -194,7 +196,7 @@ This option will list all test profiles that are available from the enabled Open
 This option will list all test suites that are available from the enabled OpenBenchmarking.org repositories.
 
 #### list-available-tests
-This option will list all test profiles that are available from the enabled OpenBenchmarking.org repositories where supported on the system and are of a verified state. If the system has no Internet access, it will only list the test profiles where the necesary test assets are available locally on the system or on an available network cache (the same behavior as using the list-cached-tests sub-command), unless using the list-all-tests option to override this behavior.
+This option will list all test profiles that are available from the enabled OpenBenchmarking.org repositories where supported on the system and are of a verified state. If the system has no Internet access, it will only list the test profiles where the necessary test assets are available locally on the system or on an available network cache (the same behavior as using the list-cached-tests sub-command), unless using the list-all-tests option to override this behavior.
 
 #### list-available-virtual-suites
 This option will list all available virtual test suites that can be dynamically created based upon the available tests from enabled OpenBenchmarking.org repositories.
@@ -223,11 +225,11 @@ This option will list all of the packages / external test dependencies that are 
 #### list-saved-results
 This option will list all of the saved test results found on the system.
 
+#### list-test-status
+This sub-command provides a verbose look at all tests installed/uninstalled on the system and whether any errors were encountered at install-time or run-time and other test installation/runtime metrics for complementing other Phoronix Test Suite sub-command outputs.
+
 #### list-test-usage
 This option will list various details about installed tests and their usage.
-
-#### list-unsupported-tests
-This option will list all available test profiles that are available from the enabled OpenBenchmarking.org repositories but are NOT SUPPORTED on the given hardware/software platform. This is mainly a debugging option for those looking for test profiles to potentially port to new platforms, etc.
 
 #### search
 This option provides command-line searching abilities for test profiles / test suites / test results. The search query can be passed as a parameter otherwise the user is prompted to input their search query..
@@ -258,14 +260,14 @@ This option will check all download links within the specified test profile(s) t
 #### download-test-files  [Test | Suite | OpenBenchmarking ID | Test Result]  ...
 This will download the selected test file(s) to the Phoronix Test Suite download cache but will not install the tests.
 
+#### dump-documentation
+This option is used for re-generating the Phoronix Test Suite documentation.
+
 #### inspect-test-profile  [Test]
 This option can be used for inspecting a Phoronix Test Suite test profile with providing inside details on test profiles for debugging / evaluation / learning purposes.
 
 #### rebuild-test-suite  [Suite]
 This option will regenerate the local test suite XML file against the OpenBenchmarking.org specification. This can be used to clean up any existing XML syntax / styling issues, etc.
-
-#### result-file-to-suite  [Test Result]
-This option will guide the user through the process of generating their own test suite, which they can then run, that is based upon an existing test results file.
 
 #### validate-result-file
 This option can be used for validating a Phoronix Test Suite result file as being compliant against the OpenBenchmarking.org specification.
@@ -278,11 +280,8 @@ This option can be used for validating a Phoronix Test Suite test suite as being
 
 
 ## Result Management
-#### analyze-run-times  [Test Result]
-This option will read a saved test results file and print the statistics about how long the testing took to complete.
-
 #### auto-sort-result-file  [Test Result]
-This option is used if you wish to automatically attempt to sort the results by their result identifier string.
+This option is used if you wish to automatically attempt to sort the results by their result identifier string. Alternatively, if using the environment variable "SORT_BY" other sort modes can be used, such as SORT_BY=date / SORT_BY=date-desc for sorting by the test run-time/date.
 
 #### compare-results-to-baseline  [Test Result] [Test Result]
 This option will allows you to specify a result as a baseline (first parameter) and a second result file (second parameter) that will offer some analysis for showing how the second result compares to the first in matching tests.
@@ -301,6 +300,9 @@ This option is the inverse of the remove-results-from-result-file sub-command. I
 
 #### merge-results  [Test Result]  ...
 This option will manually merge multiple sets of test results generated by the Phoronix Test Suite.
+
+#### remove-incomplete-results-from-result-file  [Test Result]
+This option is used if there are test results (benchmarks) to be dropped from a given result file for having incomplete data, either a test run did not attempt to run that benchmark or failed to properly run. The user must specify a saved results file and the command will then attempt to find any results with incomplete/missing data and prompt the user with confirmation to remove them.
 
 #### remove-result  [Test Result]
 This option will permanently remove the saved file set that is set as the first argument.
@@ -323,26 +325,8 @@ This option is used if you wish to change the name of the saved name of a result
 #### reorder-result-file  [Test Result]
 This option is used if you wish to manually change the order in which test results are shown in the Phoronix Test Suite Results Viewer and the contained graphs. The user must specify a saved results file and then they will be prompted to select the results identifiers one at a time in the order they would like them to be displayed from left to right.
 
-#### result-file-raw-to-csv  [Test Result]
-This option will read a saved test results file and output the raw result file run data to a CSV file. This raw (individual) result file output is intended for data analytic purposes where the result-file-to-csv is more end-user-ready.
-
-#### result-file-to-csv  [Test Result]
-This option will read a saved test results file and output the system hardware and software information along with the results to a CSV output. The CSV (Comma Separated Values) output can then be loaded into a spreadsheet for easy viewing.
-
-#### result-file-to-json  [Test Result]
-This option will read a saved test results file and output the basic result information to JSON (JavaScript Object Notation).
-
-#### result-file-to-pdf  [Test Result]
-This option will read a saved test results file and output the system hardware and software information along with the results to a PDF file.
-
-#### result-file-to-text  [Test Result]
-This option will read a saved test results file and output the system hardware and software information to the terminal. The test results are also outputted.
-
 #### show-result  [Test Result]
 Open up the test results in the Phoronix Test Suite Result Viewer or on OpenBenchmarking.org.
-
-#### workload-topology  [Test Result]
-This option will read a saved test results file and print the test profiles contained within and their arrangement within different test suites for getting an idea as to the workload topology/make-up / logical groupings of the benchmarks being run.
 
 
 ## Other
@@ -365,6 +349,26 @@ This option will display a list of available Phoronix Test Suite commands and po
 This option will display the Phoronix Test Suite client version.
 
 
+## Result Analysis
+#### analyze-run-times  [Test Result]
+This option will read a saved test results file and print the statistics about how long the testing took to complete.
+
+#### executive-summary  [Test Result]
+This option will attempt to auto-generate a textual executive summary for a result file to highlight prominent results / averages.
+
+#### result-file-confidence  [Test Result]
+This option will read a saved test results file and display various statistics on the confidence of the results with the standard deviation, three-sigma values, and other metrics while color-coding "passing" results in green.
+
+#### result-file-stats  [Test Result]
+This option is used if you wish to analyze a result file by seeing various statistics on the result data for result files containing at least two sets of data.
+
+#### wins-and-losses  [Test Result]
+This option is used if you wish to analyze a result file to see which runs produced the most wins/losses of those result identifiers in the saved file.
+
+#### workload-topology  [Test Result]
+This option will read a saved test results file and print the test profiles contained within and their arrangement within different test suites for getting an idea as to the workload topology/make-up / logical groupings of the benchmarks being run.
+
+
 ## Modules
 #### auto-load-module
 This option can be used for easily adding a module to the AutoLoadModules list in the Phoronix Test Suite user configuration file. That list controls what PTS modules are automatically loaded on start-up of the Phoronix Test Suite.
@@ -385,6 +389,38 @@ This option can be used for debugging a Phoronix Test Suite module.
 This option can be used for easily removing a module from the AutoLoadModules list in the Phoronix Test Suite user configuration file. That list controls what modules are automatically loaded on start-up of the Phoronix Test Suite.
 
 
+## Debugging
+#### check-tests  [Test]
+This option will perform a check on one or more test profiles to determine if there have been any vendor changes to the filename, filesize, url location, md5 and sha256 checksums.
+
+#### diagnostics
+This option will print information that is useful to developers when debugging problems with the Phoronix Test Suite and/or test profiles and test suites.
+
+#### dump-file-info
+This option will dump the MD5 / SHA256 hashes and file size for a given file.
+
+#### dump-openbenchmarking-indexes
+This option is used for dumping the parsed output of OpenBenchmarking.org index files (metadata).
+
+#### dump-phodevi-smart-cache
+This option is used for displaying the contents of the Phodevi smart cache on the system.
+
+#### dump-possible-options
+This option will print all possible phoronix-test-suite sub-commands.
+
+#### dump-unhandled-dependencies
+This option will list missing entries in the external dependencies XML file for the operating system under test. This option is used if wanting to help find missing dependency XML data to fill in for contributing to upstream Phoronix Test Suite.
+
+#### list-failed-installs
+This option will list all test profiles that were attempted to be installed on the local system but failed to be installed. Where applicable, the possible error(s) from the test installation are also reported to assist in debugging.
+
+#### list-test-errors
+This sub-command is complementary to list-failed-installs. Rather than listing test installation errors, list-test-errors is used for displaying past test run-time errors. This option will list all test profiles that produced an error previously when running the test profile / benchmark. If a test profile later successfully ran the test with any given option(s) without errors, the error is then removed from the archive. This option is intended to be helpful in debugging test profile issues later on for having a persistent collection of run-time errors.
+
+#### list-unsupported-tests
+This option will list all available test profiles that are available from the enabled OpenBenchmarking.org repositories but are NOT SUPPORTED on the given hardware/software platform. This is mainly a debugging option for those looking for test profiles to potentially port to new platforms, etc.
+
+
 ## User Configuration
 #### enterprise-setup
 This option can be run by enterprise users immediately after package installation or as part of an in-house setup script. Running this command will ensure the phoronix-test-suite program is never interrupted on new runs to accept user agreement changes and defaults the anonymous usage reporting to being disabled and other conservative defaults.
@@ -401,19 +437,31 @@ This option can be used for resetting the Phoronix Test Suite user configuration
 #### user-config-set
 This option can be used for setting an XML value in the Phoronix Test Suite user configuration file.
 
+#### variables
+This option will print all of the official environment variables supported by the Phoronix Test Suite for user configuration purposes. These environment variables are also listed as part of the official Phoronix Test Suite documentation while this command will also show the current value of the variables if currently set.
 
-## Result Analysis
-#### executive-summary  [Test Result]
-This option will attempt to auto-generate a textual executive summary for a result file to highlight prominent results / averages.
 
-#### result-file-confidence  [Test Result]
-This option will read a saved test results file and display various statistics on the confidence of the results with the standard deviation, three-sigma values, and other metrics while color-coding "passing" results in green.
+## Result Export
+#### result-file-raw-to-csv  [Test Result]
+This option will read a saved test results file and output the raw result file run data to a CSV file. This raw (individual) result file output is intended for data analytic purposes where the result-file-to-csv is more end-user-ready.
 
-#### result-file-stats  [Test Result]
-This option is used if you wish to analyze a result file by seeing various statistics on the result data for result files containing at least two sets of data.
+#### result-file-to-csv  [Test Result]
+This option will read a saved test results file and output the system hardware and software information along with the results to a CSV output. The CSV (Comma Separated Values) output can then be loaded into a spreadsheet for easy viewing. The outputted file appears in the user home directory or can otherwise be controlled via the OUTPUT_DIR and OUTPUT_FILE environment variables.
 
-#### wins-and-losses  [Test Result]
-This option is used if you wish to analyze a result file to see which runs produced the most wins/losses of those result identifiers in the saved file.
+#### result-file-to-html  [Test Result]
+This option will read a saved test results file and output the system hardware and software information along with the results to pure HTML file. No external files are required for CSS/JavaScript or other assets. The graphs are rendered as inline SVG. This is a pure HTML-only representation of the results for emailing or other easy analysis outside of the Phoronix Test Suite. The outputted file appears in the user home directory or can otherwise be controlled via the OUTPUT_DIR and OUTPUT_FILE environment variables.
+
+#### result-file-to-json  [Test Result]
+This option will read a saved test results file and output the basic result information to JSON (JavaScript Object Notation). The outputted file appears in the user home directory or can otherwise be controlled via the OUTPUT_DIR and OUTPUT_FILE environment variables.
+
+#### result-file-to-pdf  [Test Result]
+This option will read a saved test results file and output the system hardware and software information along with the results to a PDF file. The outputted file appears in the user home directory or can otherwise be controlled via the OUTPUT_DIR and OUTPUT_FILE environment variables.
+
+#### result-file-to-suite  [Test Result]
+This option will guide the user through the process of generating their own test suite, which they can then run, that is based upon an existing test results file.
+
+#### result-file-to-text  [Test Result]
+This option will read a saved test results file and output the system hardware and software information to the terminal. The test results are also outputted.
 
 
 ## Phoromatic
@@ -427,7 +475,7 @@ Start the web-based result viewer.
 
 
 # Module Options
-The following list is the modules included with the Phoronix Test Suite that are intended to extend the functionality of pts-core. Some of these options have commands that can be run directly in a similiar manner to the other Phoronix Test Suite user commands. Some modules are just meant to be loaded directly by adding the module name to the AutoLoadModules tag in ~/.phoronix-test-suite/user-config.xml or via the PTS_MODULES environment variable. A list of available modules is also available by running *phoronix-test-suite list-modules.*
+The following list is the modules included with the Phoronix Test Suite that are intended to extend the functionality of pts-core. Some of these options have commands that can be run directly in a similar manner to the other Phoronix Test Suite user commands. Some modules are just meant to be loaded directly by adding the module name to the AutoLoadModules tag in ~/.phoronix-test-suite/user-config.xml or via the PTS_MODULES environment variable. A list of available modules is also available by running *phoronix-test-suite list-modules.*
 
 
 ---
@@ -435,15 +483,23 @@ The following list is the modules included with the Phoronix Test Suite that are
 ### Backup Creation + Restore
 This is a module for creating backups of the Phoronix Test Suite / Phoromatic and allows for restoring of created backups. The backup will be in ZIP or TAR format. If only a path is specified, the file-name will be auto-generated with a current time-stamp.
 
-phoronix-test-suite backup.create
+**phoronix-test-suite backup.create**
 
-phoronix-test-suite backup.restore
+**phoronix-test-suite backup.restore**
+
+
+### System Maintenance / Cleanup
+This module can be used for system maintenance cleanup tasks around the Phoronix Test Suite. Currently implemented is support for automatically un-installing tests that have not been run in a period of time. When the module is loaded via the REMOVE_TESTS_OLDER_THAN environment variable, it will be automatically invoked at the end of running any benchmarks. Or this module can be manually invoked with the command: phoronix-test-suite cleanup.tests.
+
+**phoronix-test-suite cleanup.tests**
+
+This module utilizes the following environment variables: REMOVE_TESTS_OLDER_THAN.
 
 
 ### Dummy Module
 This is a simple module intended for developers to just demonstrate some of the module functions.
 
-phoronix-test-suite dummy_module.dummy-command
+**phoronix-test-suite dummy_module.dummy-command**
 
 This is a simple module intended for developers to just demonstrate some of the module functions.
 
@@ -451,67 +507,61 @@ This is a simple module intended for developers to just demonstrate some of the 
 ### Flush Caches
 Loading this module will ensure caches (page cache, swap, etc) automatically get flushed prior to running any test.
 
-This module utilizes the following environmental variables: PTS_FLUSH_CACHES.
-
-
-### Graphics Override
-This module allows you to override some graphics rendering settings for the ATI and NVIDIA drivers while running the Phoronix Test Suite.
-
-This module utilizes the following environmental variables: FORCE_AA, FORCE_AF.
+This module utilizes the following environment variables: PTS_FLUSH_CACHES.
 
 
 ### Result Exporter To HTML
 This module allows basic exporting of results to HTML for saving either to a file locally (specified using the EXPORT_RESULTS_HTML_FILE_TO environment variable) or to a mail account (specified using the EXPORT_RESULTS_HTML_EMAIL_TO environment variable). EXPORT_RESULTS_HTML_EMAIL_TO supports multiple email addresses delimited by a comma.
 
-This module utilizes the following environmental variables: EXPORT_RESULTS_HTML_EMAIL_TO, EXPORT_RESULTS_HTML_FILE_TO.
+This module utilizes the following environment variables: EXPORT_RESULTS_HTML_EMAIL_TO, EXPORT_RESULTS_HTML_FILE_TO.
 
 
 ### Linux Perf Framework Reporter
-Setting LINUX_PERF=1 will auto-load and enable this Phoronix Test Suite module. The module also depends upon running a modern Linux kernel (supporting perf) and that the perf binary is available via standard system paths.
+Setting LINUX_PERF=1 will auto-load and enable this Phoronix Test Suite module. The module also depends upon running a modern Linux kernel (supporting perf) and that the perf binary is available via standard system paths. Depending upon system permissions you may be limited to using perf as root or adjusting the /proc/sys/kernel/perf_event_paranoid setting.
 
-This module utilizes the following environmental variables: LINUX_PERF.
+This module utilizes the following environment variables: LINUX_PERF.
 
 
 ### Dynamic Result Viewer
 This module pre-loads the HTTP dynamic result viewer for Phoronix Test Suite data.
 
-phoronix-test-suite load_dynamic_result_viewer.start
+**phoronix-test-suite load_dynamic_result_viewer.start**
 
 
 ### Log Exporter
 This module allows for easily exporting test run logs and system logs to external locations via specifying the directory paths via the COPY_TEST_RUN_LOGS_TO and COPY_SYSTEM_LOGS_TO environment variables.
 
-This module utilizes the following environmental variables: COPY_TEST_RUN_LOGS_TO, COPY_SYSTEM_LOGS_TO.
+This module utilizes the following environment variables: COPY_TEST_RUN_LOGS_TO, COPY_SYSTEM_LOGS_TO.
 
 
 ### MATISK
 My Automated Test Infrastructure Setup Kit
 
-phoronix-test-suite matisk.run
+**phoronix-test-suite matisk.run**
 
-phoronix-test-suite matisk.template
+**phoronix-test-suite matisk.template**
 
 
 ### OpenBenchmarking.org Auto Comparison
 This module prints comparable OpenBenchmarking.org results in the command-line for reference purposes as tests are being run. OpenBenchmarking.org is automatically queried for results to show based on the test comparison hash and the system type (mobile, desktop, server, cloud, workstation, etc). No other system information or result data is transmitted.
 
-phoronix-test-suite ob_auto_compare.debug
+**phoronix-test-suite ob_auto_compare.debug**
 
 
 ### Performance Per Dollar/Cost Calculator
 Setting the COST_PERF_PER_DOLLAR= environment variable to whatever value of the system cost/component you are running a comparison on will yield extra graphs that calculate the performance-per-dollar based on the test being run. The COST_PERF_PER_DOLLAR environment variable is applied just to the current test run identifier. Set the COST_PERF_PER_UNIT= environment variable if wishing to use a metric besides dollar/cost. The COST_PERF_PER_HOUR value can be used rather than COST_PERF_PER_DOLLAR if wishing to calculate the e.g. cloud time or other compute time based on an hourly basis.
 
-phoronix-test-suite perf_per_dollar.add
+**phoronix-test-suite perf_per_dollar.add**
 
-This module utilizes the following environmental variables: COST_PERF_PER_DOLLAR, COST_PERF_PER_UNIT, COST_PERF_PER_HOUR.
+This module utilizes the following environment variables: COST_PERF_PER_DOLLAR, COST_PERF_PER_UNIT, COST_PERF_PER_HOUR.
 
 
 ### Performance Tip Prompts
 This module alerts the user if the system configuration may not be the right one for achieving the best performance with the target benchmark(s). This initial version of the module actually cares only about the BFQ I/O scheduler and powersave governor checks.
 
-phoronix-test-suite perf_tips.show
+**phoronix-test-suite perf_tips.show**
 
-This module utilizes the following environmental variables: SUPPRESS_PERF_TIPS.
+This module utilizes the following environment variables: SUPPRESS_PERF_TIPS.
 
 This module alerts the user if the system configuration may not be the right one for achieving the best performance with the target benchmark(s). This initial version of the module actually cares only about the BFQ I/O scheduler: it gives a warning if BFQ is being used with an incorrect configuration in a disk benchmark, and suggests the right configuration to use. For the moment it only works for existing, throughput-based tests. It will need to be extended for responsiveness and soft real-time-latency tests.
 
@@ -519,25 +569,25 @@ This module alerts the user if the system configuration may not be the right one
 ### Benchmarking Compiler PGO Impact
 This module makes it easy to test a compiler PGO (Profile Guided Optimization) performance impact by running a test without PGO optimizations, capturing the PGO profile, rebuilding the tests with the PGO profile generated, and then repeat the benchmarks.
 
-phoronix-test-suite pgo.benchmark
+**phoronix-test-suite pgo.benchmark**
 
 
 ### Phoromatic Client
 The Phoromatic client is used for connecting to a Phoromatic server (Phoromatic.com or a locally run server) to facilitate the automatic running of tests, generally across multiple test nodes in a routine manner. For more details visit http://www.phoromatic.com/. This module is intended to be used with Phoronix Test Suite 5.2+ clients and servers.
 
-phoronix-test-suite phoromatic.connect
+**phoronix-test-suite phoromatic.connect**
 
-phoronix-test-suite phoromatic.explore
+**phoronix-test-suite phoromatic.explore**
 
-phoronix-test-suite phoromatic.upload-result
+**phoronix-test-suite phoromatic.upload-result**
 
-phoronix-test-suite phoromatic.set-root-admin-password
+**phoronix-test-suite phoromatic.set-root-admin-password**
 
-phoronix-test-suite phoromatic.list-results
+**phoronix-test-suite phoromatic.list-results**
 
-phoronix-test-suite phoromatic.clone
+**phoronix-test-suite phoromatic.clone**
 
-phoronix-test-suite phoromatic.export-results-for-account-schedules
+**phoronix-test-suite phoromatic.export-results-for-account-schedules**
 
 The Phoromatic module contains the client support for interacting with Phoromatic and Phoromatic Tracker services.
 
@@ -545,13 +595,13 @@ The Phoromatic module contains the client support for interacting with Phoromati
 ### Pushover.net
 Submit notifications to your iOS/Android mobile devices of test results in real-time as push notifications, etc. Using the Pushover.net API.
 
-This module utilizes the following environmental variables: PUSHOVER_NET_USER.
+This module utilizes the following environment variables: PUSHOVER_NET_USER.
 
 
 ### Report Test Time Graphs
 Setting the RUN_TIMES_ARE_A_BENCHMARK=1 environment variable will automatically create additional graphs for each test run plotting the run-time needed for each test being executed. Setting the INSTALL_TIMES_ARE_A_BENCHMARK=1 environment variable will automatically create additional graphs for each test run plotting the time required for the test installation. Setting the INSTALL_SIZES_ARE_A_BENCHMARK=1 environment variable will automatically create additional graphs for each test run plotting the size of the installed test directory.
 
-This module utilizes the following environmental variables: RUN_TIMES_ARE_A_BENCHMARK, INSTALL_TIMES_ARE_A_BENCHMARK, INSTALL_SIZES_ARE_A_BENCHMARK.
+This module utilizes the following environment variables: RUN_TIMES_ARE_A_BENCHMARK, INSTALL_TIMES_ARE_A_BENCHMARK, INSTALL_SIZES_ARE_A_BENCHMARK.
 
 
 ### Result Notifier
@@ -561,13 +611,13 @@ A notification module.
 ### Custom Result Export Methods
 A simple example module about interfacing with Phoronix Test Suite core for dumping result files in a custom format.
 
-phoronix-test-suite results_custom_export.nf
+**phoronix-test-suite results_custom_export.nf**
 
 
 ### System Monitor
 This module contains sensor monitoring support.
 
-This module utilizes the following environmental variables: MONITOR, PERFORMANCE_PER_WATT, PERFORMANCE_PER_SENSOR, MONITOR_INTERVAL, MONITOR_PER_RUN.
+This module utilizes the following environment variables: MONITOR, PERFORMANCE_PER_WATT, PERFORMANCE_PER_SENSOR, MONITOR_INTERVAL, MONITOR_PER_RUN.
 
 Monitoring these sensors is as easy as running your normal Phoronix Test Suite commands but at the beginning of the command add: MONITOR=<selected sensors>.  For example, this will monitor the CPU temperature and voltage during tests: 
 
@@ -594,6 +644,14 @@ Supported Options:
   - cpu.freq.cpu5
   - cpu.freq.cpu6
   - cpu.freq.cpu7
+  - cpu.freq.cpu8
+  - cpu.freq.cpu9
+  - cpu.freq.cpu10
+  - cpu.freq.cpu11
+  - cpu.freq.cpu12
+  - cpu.freq.cpu13
+  - cpu.freq.cpu14
+  - cpu.freq.cpu15
   - cpu.peak-freq
   - cpu.power
   - cpu.temp
@@ -607,6 +665,14 @@ Supported Options:
   - cpu.usage.cpu5
   - cpu.usage.cpu6
   - cpu.usage.cpu7
+  - cpu.usage.cpu8
+  - cpu.usage.cpu9
+  - cpu.usage.cpu10
+  - cpu.usage.cpu11
+  - cpu.usage.cpu12
+  - cpu.usage.cpu13
+  - cpu.usage.cpu14
+  - cpu.usage.cpu15
   - cpu.usage.summary
   - cpu.voltage
   - all.gpu
@@ -620,18 +686,15 @@ Supported Options:
   - all.hdd
   - hdd.read-speed
   - all.hdd.read-speed
-  - hdd.read-speed.sda
-  - hdd.read-speed.sdb
+  - hdd.read-speed.md127
   - hdd.read-speed.nvme0n1
   - hdd.temp
   - all.hdd.temp
-  - hdd.temp.sda
-  - hdd.temp.sdb
+  - hdd.temp.md127
   - hdd.temp.nvme0n1
   - hdd.write-speed
   - all.hdd.write-speed
-  - hdd.write-speed.sda
-  - hdd.write-speed.sdb
+  - hdd.write-speed.md127
   - hdd.write-speed.nvme0n1
   - all.memory
   - memory.temp
@@ -652,25 +715,25 @@ NOTE: Use the "system-sensors" command to see what sensors are available for mon
 ### Test Timeout
 This module allows killing a test if it exceeds a defined threshold, such as if the test is hung, etc. TEST_TIMEOUT_AFTER= environment variable can be used for controlling the behavior. When this variable is set, the value will can be set to "auto" or a positive integer. The value indicates the number of minutes until a test run should be aborted, such as for a safeguard against hung/deadlocked processes or other issues. Setting this to a high number as a backup would be recommended for fending off possible hangs / stalls in the testing process if the test does not quit on its own for whatever reason. If the value is "auto", it will quit if the time of a test run exceeds 3x the average time it normally takes the particular test to complete its run.
 
-This module utilizes the following environmental variables: TEST_TIMEOUT_AFTER.
+This module utilizes the following environment variables: TEST_TIMEOUT_AFTER.
 
 
 ### Timed Screenshot
 This is a module that will take a screenshot of the system at a pre-defined interval. ImageMagick must be installed onto the system prior to using this module.
 
-This module utilizes the following environmental variables: SCREENSHOT_INTERVAL.
+This module utilizes the following environment variables: SCREENSHOT_INTERVAL.
 
 
 ### Toggle Screensaver
 This module toggles the system's screensaver while the Phoronix Test Suite is running. At this time, the GNOME and KDE screensavers are supported.
 
-This module utilizes the following environmental variables: HALT_SCREENSAVER.
+This module utilizes the following environment variables: HALT_SCREENSAVER.
 
 
 ### Linux Turbostat Dumper
-Setting TURBOSTAT_LOG_DIR=_DIR_ will auto-load and enable this Phoronix Test Suite module. The module will -- if turbostat is installed on the system and the user is root -- allow dumping of the TurboStat data to the specified directly on a per-test basis. This allows easily collecting of turbostat logs for each test being run.
+Setting TURBOSTAT_LOG=_DIR_ will auto-load and enable this Phoronix Test Suite module. The module will -- if turbostat is installed on the system and the user is root -- allow dumping of the TurboStat data to the specified directly on a per-test basis. This allows easily collecting of turbostat logs for each test being run. If the TURBOSTAT_LOG= value does not point to a directory, the TurboStat output will be appended to the test run log files.
 
-This module utilizes the following environmental variables: TURBOSTAT_LOG_DIR.
+This module utilizes the following environment variables: TURBOSTAT_LOG.
 
 
 ### Update Checker
@@ -680,13 +743,13 @@ This module checks to see if the Phoronix Test Suite -- and its tests and suites
 ### Utilize Wine On Linux Benchmarking
 This module when activated via the USE_WINE environment variable on Linux systems will override the test profile OS target to Windows and attempt to run the (Windows) tests under Wine, if installed on the system. USE_WINE can be either set to the name of the desired wine command or the absolute path to the wine binary you wish to use for benchmarking.
 
-This module utilizes the following environmental variables: USE_WINE.
+This module utilizes the following environment variables: USE_WINE.
 
 
 ### System Event Watchdog
 This module has support for stopping/interrupting tests if various system issues occur, like a temperature sensor exceeds a defined threshold.
 
-This module utilizes the following environmental variables: WATCHDOG_SENSOR, WATCHDOG_SENSOR_THRESHOLD.
+This module utilizes the following environment variables: WATCHDOG_SENSOR, WATCHDOG_SENSOR_THRESHOLD, WATCHDOG_MAXIMUM_WAIT.
 
 
 # Installation Instructions
@@ -703,6 +766,8 @@ Among the tested BSD distributions are FreeBSD, NetBSD, OpenBSD, and DragonflyBS
 The only required dependency for the Phoronix Test Suite is PHP 5.3 or newer. On Linux distributions, the needed package is commonly called *php5-cli* or *php-cli* or *php7* or *php* . It is important to note that only PHP for the command-line is needed and not a web server (Apache) or other packages commonly associated with PHP and its usage by web-sites. The PHP5 version required is PHP 5.3+ and can also be found at [www.php.net](http://www.php.net/) . PHP 7 and PHP 8 are also fully supported by the Phoronix Test Suite.
 
 The *phoronix-test-suite.bat* Windows launcher for the Phoronix Test Suite will automatically download and setup PHP on the local system if PHP is not present already.
+
+The Phoronix Test Suite does not need to be installed system-wide but can simply be run from the extracted phoronix-test-suite folder as the local user.
 
 As part of the PHP requirement, the following PHP extensions are required and/or highly recommended in order to take advantage of the Phoronix Test Suite capabilities:
 
@@ -765,15 +830,15 @@ The Phoronix Test Suite also supports *BSD operating systems. However, like the 
 
 
 ### MacOS Installation
-The Phoronix Test Suite is fully supported on Apple's macOS operating system. PHP ships with macOS by default so it's simply a matter of downloading the Phoronix Test Suite package, extracting it, and running the executable. For tests that rely upon a compiler, Apple's XCode with GCC and LLVM can be utilized.
+The Phoronix Test Suite is fully supported on Apple's macOS operating system. PHP ships with macOS by default on macOS 12 and older so it's simply a matter of downloading the Phoronix Test Suite package, extracting it, and running the executable. For tests that rely upon a compiler, Apple's XCode with GCC and LLVM can be utilized. On newer versions of macOS not shipping with PHP by default, [Homebrew](https://brew.sh/) can be used for installing PHP or building PHP from source. The Phoronix Test Suite also supports making use of Homebrew for acquiring necessary Phoronix Test Suite dependencies on macOS.
 
 
 # Phoronix Test Suite On Windows
 
 ### Introduction
-Phoronix Test Suite 8.0 introduced rewritten Windows support that is at a near feature parity to the program's long-standing support for Linux, macOS, BSD and Solaris operating systems.
+Phoronix Test Suite 8.0 introduced rewritten Windows support that is at near feature parity to the program's long-standing support for Linux, macOS, and BSD operating systems.
 
-The Phoronix Test Suite Windows support currently targets **Windows 10 x64** , **Windows 11 x64** and **Windows Server 2016 x64** . Earlier versions of Windows, namely Windows Server 2012 and Windows 8, may work to some extent but some hardware/software reporting features and other capabilities may be missing or report warning messages. The Phoronix Test Suite Windows support is also exclusively focused on x86 64-bit support: the Phoronix Test Suite itself will run on x86 32-bit but many of the program dependencies are configured for making use of 64-bit binaries.
+The Phoronix Test Suite Windows support currently targets **Windows 10 x64** , **Windows 11 x64** and **Windows Server 2016 x64** and later. Earlier versions of Windows, namely Windows Server 2012 and Windows 8, may work to some extent but some hardware/software reporting features and other capabilities may be missing or report warning messages. The Phoronix Test Suite Windows support is also exclusively focused on x86 64-bit support: the Phoronix Test Suite itself will run on x86 32-bit but many of the program dependencies are configured for making use of 64-bit binaries.
 
 
 ### Windows Setup / Dependencies
@@ -787,7 +852,7 @@ Various test profiles may depend upon other "external dependencies" like Python,
 ### Running The Phoronix Test Suite On Windows
 The Phoronix Test Suite can run from its local directory and does not need to be "installed" to a system path or any other "setup" process prior to execution. On a clean install of Windows or Windows Server, deploying the Phoronix Test Suite is designed to be as easy and straight-forward as possible:
 
-1. Download the Phoronix Test Suite 8.0+ or [Phoronix-Test-Suite from GitHub](https://github.com/phoronix-test-suite/phoronix-test-suite) ( [zip file](https://github.com/phoronix-test-suite/phoronix-test-suite/archive/master.zip) ).
+1. Download the Phoronix Test Suite from [Phoronix-Test-Suite on GitHub](https://github.com/phoronix-test-suite/phoronix-test-suite) ( [zip file](https://github.com/phoronix-test-suite/phoronix-test-suite/archive/master.zip) ).
 
 2. From the Command Prompt or PowerShell, enter the *phoronix-test-suite* directory whether it be from Git or a zipped download.
 
@@ -813,13 +878,15 @@ Below are a list of the operating systems that currently have external dependenc
 ---
 
 
-Alpine LinuxAmazonAngstromArch LinuxClear LinuxClearOSClearOS Core ServerDebianDragonFlyBSDFedoraGentooLinux Embedded Development EnvironmentLinux MintMac OS XMacPortsMageiaMandrivaMicrosoft WindowsMidnightBSDNetBSDOpenIndianaOpenMandrivaOpenMandrivaLinuxOpenSolarisOpenSuSEOptwareOracle ServerPCLinuxOSPardus LinuxRed Hat EnterpriseRed Hat Enterprise ServerSUSESUSE LinuxScientificScientificSLSolusSolus LinuxTermuxUbuntuVoid LinuxZenwalkmacOS Brew
+Alpine LinuxAmazonAngstromArch LinuxClear LinuxClearOSClearOS Core ServerDebianDragonFlyBSDFedoraGentooLinux Embedded Development EnvironmentLinux MintMac OS XMacPortsMageiaMandrivaMicrosoft WindowsMidnightBSDNetBSDOpenBSDOpenIndianaOpenMandrivaOpenMandrivaLinuxOpenSolarisOpenSuSEOptwareOracle ServerPCLinuxOSPardus LinuxRed Hat EnterpriseRed Hat Enterprise ServerSUSESUSE LinuxScientificScientificSLSolusSolus LinuxTermuxUbuntuVoid LinuxZenwalkmacOS Brew
 # Configuration
 
 ## User Files & Folders
+These files/folders are the default locations when running as a non-root Phoronix Test Suite user. When running as root, the paths may appear in standard system paths like */etc/phoronix-test-suite.xml* .
+
 **~/.phoronix-test-suite/user-config.xml**
 
-This is a per-user configuration file. Among the information stored here is the test options, locations for storing files, and batch mode options. This file is formatted in XML.
+This is a per-user configuration file. Among the information stored here is the test options, locations for storing files, and batch mode options. This file is formatted in XML. When run as root, this path is */etc/phoronix-test-suite.xml* .
 
 **~/.phoronix-test-suite/graph-config.json**
 
@@ -831,7 +898,7 @@ This directory contains test packages that have been downloaded for test profile
 
 **~/.phoronix-test-suite/installed-tests/**
 
-This directory is where tests are installed by default. Each test has its own directory within a sub-directory of *installed-tests/* based upon its OpenBenchmarking.org repository. In the test's folder is a *pts-install.xml* file used for managing the installation.
+This directory is where tests are installed by default. Each test has its own directory within a sub-directory of *installed-tests/* based upon its OpenBenchmarking.org repository. In the test's folder is a *pts-install.json* file used for managing the installation.
 
 **~/.phoronix-test-suite/test-results/**
 
@@ -848,148 +915,6 @@ This is the directory where test profiles are stored.
 **~/.phoronix-test-suite/test-suites/**
 
 This is the directory where test suites are stored.
-
-
-## Environment Variables
-**TEST_TIMEOUT_AFTER**
-
-When this variable is set, the value will can be set to *auto* or a positive integer. The value indicates the number of minutes until a test run should be aborted, such as for a safeguard against hung/deadlocked processes or other issues. Setting this to a high number as a backup would be recommended for fending off possible hangs / stalls in the testing process if the test does not quit. If the value is *auto* , it will quit if the time of a test run exceeds 3x the average time it normally takes the particular test to complete its run. In the future, auto might be enabled by default in a future PTS release.
-
-**TEST_RESULTS_NAME**
-
-When this variable is set, the value will be used as the name for automatically saving the test results.
-
-**TEST_RESULTS_IDENTIFIER**
-
-When this variable is set, the value will be used as the test identifier when automatically saving the test results.
-
-**TEST_RESULTS_DESCRIPTION**
-
-When this variable is set, the value will be used as the test results description when saving the test results.
-
-**PRESET_OPTIONS**
-
-For setting any test option(s) from an environment variable rather than being prompted for the options when running a test. Example: *PRESET_OPTIONS="stream.run-type=Add" ./phoronix-test-suite benchmark stream* . Multiple options can be passed to this environment variable when delimited by a semicolon.
-
-**SKIP_TESTS**
-
-If there are any test(s) to exempt from the testing process, specify them in this variable. Multiple tests can be waived by delimiting each test identifier by a comma. A test hardware type (i.e. Graphics) can also be supplied for skipping a range of tests.
-
-**SKIP_TESTS_HAVING_ARGS**
-
-If any of the test(s) have an argument matching any strings contained in this environment variable, the test execution will be skipped. Multiple strings can be set when delimiting by a comma.
-
-**RUN_TESTS_IN_RANDOM_ORDER**
-
-Setting this environment variable will cause the tests to be run in a random order.
-
-**SKIP_TESTING_SUBSYSTEMS**
-
-If you are running a set of benchmarks (namely a result file) but wish to skip some of the tests that don't belong to a certain test type group, you can set the hardware types to test via this environment variable. E.g. setting *SKIP_TESTING_SUBSYSTEMS=Graphics* will skip all test profiles to run that are not of the graphics test group. Multiple types should be delimited by a comma.
-
-**PTS_MODULE_SETUP**
-
-This variable can be used to load Phoronix Test Suite module settings automatically when using the *module-setup* option. An example would be: *PTS_MODULE_SETUP="phoromatic.remote_host=http://www.phoromatic.com/; phoromatic.remote_account=123456; phoromatic.remote_verifier=ABCD" phoronix-test-suite module-setup phoromatic* .
-
-**PTS_MODULES**
-
-If there are any Phoronix Test Suite modules to additionally load, they can be specified here. Multiple modules can be supplied by delimiting them with a comma. The more appropriate way of loading Phoronix Test Suite modules for longer periods of time is by using the *~/.phoronix-test-suite/user-config.xml* configuration.
-
-**NO_PHODEVI_CACHE**
-
-This is a debugging option to disable the Phodevi cache from being loaded of cached software/hardware information. Instead, all software/hardware will be polled from the Phodevi library without caching.
-
-**EXTERNAL_PHODEVI_CACHE**
-
-This option can be used for loading an external Phodevi cache. Such as loading the native hardware/software information from within a Windows Wine client from a native system host.
-
-**PTS_DISPLAY_MODE**
-
-If you wish to load a non-default display mode for a single instance, specify the mode in this variable.
-
-**TOTAL_LOOP_TIME**
-
-When running any test(s), if you would like the test(s) to continue running as a loop until a certain time has been reached, this variable can be used. The value should be the number of minutes to run the testing process before the loop is ended. The testing will finish whenever the currently active test has finished once the time has elapsed. The minimum value allowed is 10 minutes.
-
-**LIMIT_ELAPSED_TEST_TIME**
-
-If you want to ensure that the time for a given Phoronix Test Suite process doesn't elapse past a certain number of minutes, specify the number of minutes for this environment variable. When the amount of time spent testing exceeds that amount, the testing will end prematurely while still saving the tests that were completed in time.
-
-**TOTAL_LOOP_COUNT**
-
-When running any test(s), if you would like the test(s) to continue running for a number of times, this variable can be used. The value should be the number of times to loop the testing process before ending.
-
-**FORCE_TIMES_TO_RUN**
-
-If you wish to override the number of times to run each test -- rather than the Phoronix Test Suite using the number of times specified in each test profile -- this variable can be used.
-
-**FORCE_TIMES_TO_RUN_MULTIPLE**
-
-This option allows specifying a multiple for increasing the number of times a test will run based upon the original TimesToRun value specified in the test definition. This allows for increasing the expected times to run based on a multiple of that default rather than a static value.
-
-**FORCE_MIN_TIMES_TO_RUN**
-
-This is similar to the FORCE_TIMES_TO_RUN option but will only be used if the test profile's run count is less than this defined value.
-
-**FORCE_MIN_TIMES_TO_RUN_CUTOFF**
-
-When used in conjunction with FORCE_MIN_TIMES_TO_RUN, the override value will only be applied to test profiles where its average run-time length (in minutes) is less than the value specified by FORCE_MIN_TIMES_TO_RUN_CUTOFF.
-
-**FORCE_MIN_DURATION_PER_TEST**
-
-This is similar  to FORCE_MIN_TIMES_TO_RUN but allows specifying a time (in minutes) that each test should be run for. Each test will loop at least until that amount of time has elapsed. This can be useful for short-running tests if wanting to ensure each test is run long enough to rule out system noise.
-
-**IGNORE_RUNS**
-
-IGNORE_RUNS can be passed a comma-separated list of runs to skip on each benchmark. For example, IGNORE_RUNS=1 would always drop the first run from being recorded.
-
-**NO_FILE_HASH_CHECKS**
-
-To disable MD5/SHA256 check-sums from being checked when downloading test files, set this variable to 1. This variable used to be known as *NO_MD5_CHECKS* , which is still honored but was changed to *NO_FILE_HASH_CHECKS* to reflect other kind of file hash sum checks.
-
-**NO_HTTPS**
-
-Set this environment variable to 1 if you don't wish to use HTTPS download links for test profiles (or the system/network lacks HTTPS support). When enabled, HTTPS links will then be done over HTTP.
-
-**PTS_DOWNLOAD_CACHE**
-
-While non-standard Phoronix Test Suite download caches can be specified within the *user-config.xml* file, an additional directory to look for potential Phoronix Test Suite download files can be specified by this variable.
-
-**GRAPH_HIGHLIGHT**
-
-If this variable is set with a valid test identifer from a result file whether you are using the *refresh-graphs* command or any other related to the rendering of test results on a bar graph, the specified test identifier's result will be rendered in a different color than the other test results. Multiple identifiers can be specified when delimited by a comma. Additionally, for each key it is possible to provide the actual color value, or an index in the color palette. Example: "will_be_different,group1a=1,group1b=1,blue=#0000ff"
-
-**TEST_EXEC_PREPEND**
-
-Set this variable to any command/environment variable that you may be passed prepended to the test execution string at runtime.
-
-**VIDEO_MEMORY**
-
-If Phodevi fails to detect the system's video memory capacity or is incorrectly detected, the video memory capacity (in MB) can be specified by this variable.
-
-**OVERRIDE_VIDEO_MODES**
-
-If Phodevi fails to detect all of the system's monitor video modes or a separate set of modes would be preferred, the modes can be specified in this variable. Example: *OVERRIDE_VIDEO_MODES=800x600,1024x768,1280x1024 phoronix-test-suite benchmark nexuiz* .
-
-**SKIP_TEST_SUPPORT_CHECKS**
-
-If this environment variable is set, it will not honor the support checks made by individual test profiles. I.e. test profiles that would normally be considered un-supported on a given platform are attempted to install and run regardless.
-
-**SKIP_ALL_TEST_SUPPORT_CHECKS**
-
-If this environment variable is set, all tests will be permitted on the client for execution. SKIP_ALL_TEST_SUPPORT_CHECKS is more liberal than SKIP_TEST_SUPPORT_CHECKS in letting disk tests run on RAM-based file-systems, attempt to run 2D/3D tests on VESA display drivers, and other special cases.
-
-**DEFAULT_VIDEO_MODE**
-
-If Phodevi fails to detect the system's monitor standard / default resolution, the mode can be specified in this variable. Example: *DEFAULT_VIDEO_MODE=1680x1050 phoronix-test-suite benchmark nexuiz* .
-
-**SKIP_EXTERNAL_DEPENDENCIES**
-
-To skip the Phoronix Test Suite external dependency checking/installation when installing a test, set this environment variable to *1* . If wishing to skip only certain external dependencies, set this variable's value to the name of the external dependencies (the generic dependency names used by the Phoronix Test Suite) to not install. Multiple dependencies to skip can be delimited by a comma.
-
-**PTS_EXTRA_SYSTEM_LOGS_DIR**
-
-By default the Phoronix Test Suite collects common system logs (cpuinfo, lscpu, dmesg) during the benchmarking process when saving test results. If wanting to collect additional, arbitrary system log files specific to your operating environment or for other niche system information, the *PTS_EXTRA_SYSTEM_LOGS_DIR* environment variable can be set as a path to a directory containing such log files. Prior to running the Phoronix Test Suite simply set *PTS_EXTRA_SYSTEM_LOGS_DIR* to the directory where any text files should be captured from following test completion.
 
 
 # Main Configuration File
@@ -1168,12 +1093,403 @@ If this option is set to *TRUE* when starting a Phoromatic Server instance, the 
 The location for the Phoromatic Server to store test results of connected systems, account information, etc. The default location is *~/.phoronix-test-suite/phoromatic/* .
 
 
+# Environment Variables
+
+### DONT_BALANCE_TESTS_FOR_SUBSYSTEMS
+*If this value is true, the Phoronix Test Suite stress-run manager will not attempt to distribute the selected test(s) among available hardware subsystems. For stress runs with tests covering multiple subsystems (e.g. CPU, GPU, RAM), the default behavior is try to ensure the tests to run concurrently are as balanced across the tested subsystems as possible.*
+
+The value can be of type: boolean (TRUE / FALSE).
+The variable is relevant for: stress-run mode.
+
+
+### DONT_TRY_TO_ENSURE_TESTS_ARE_UNIQUE
+*When running in the stress-run mode, the default behavior will try to ensure when tests are running concurrently that as many unique tests as possible are being run. Setting this value to try will avoid that check and just attempt to truly randomize the tests being run concurrently without regard for trying to avoid duplicates.*
+
+The value can be of type: boolean (TRUE / FALSE).
+The variable is relevant for: stress-run mode.
+
+
+### FORCE_ABSOLUTE_MIN_TIMES_TO_RUN
+*This option is similar to FORCE_MIN_TIMES_TO_RUN but is *absolute* in ensuring each test will run at least that number of times and not subject to change of any timed cut-offs or other factors.*
+
+The value can be of type: positive integer.
+The variable is relevant for: test execution / benchmarking.
+
+
+### FORCE_MIN_DURATION_PER_TEST
+*This option can be used to specify the minimum number of times to run a given benchmark. Rather than relying on a static times-to-run count, the test will keep looping until the time has exceeded this number (in minutes).*
+
+The value can be of type: positive integer.
+The variable is relevant for: test execution / benchmarking.
+
+
+### FORCE_MIN_TIMES_TO_RUN
+*This option is similar to FORCE_TIMES_TO_RUN but is used for specifying the minimum possible number of times to run. Unlike FORCE_TIMES_TO_RUN, the run count can still exceed this value if the deviation between results or other factors are too high.*
+
+The value can be of type: positive integer.
+The variable is relevant for: test execution / benchmarking.
+
+
+### FORCE_MIN_TIMES_TO_RUN_CUTOFF
+*Used in conjunction with the FORCE_MIN_TIMES_TO_RUN, the FORCE_MIN_TIMES_TO_RUN_CUTOFF can be used for specifyingg the amount of time (in minutes) before foregoing additional runs. This allows cutting off the testing early if this time threshold has been reached.*
+
+The value can be of type: positive integer.
+The variable is relevant for: test execution / benchmarking.
+
+
+### FORCE_TIMES_TO_RUN
+*This option can be used to override the default number of times a given test is run. Rather than being specified by the individual test profile, FORCE_TIMES_TO_RUN allows for specifying the number of times to run each benchmark.*
+
+The value can be of type: positive integer.
+The variable is relevant for: test execution / benchmarking.
+
+
+### FORCE_TIMES_TO_RUN_MULTIPLE
+*This option is similar to FORCE_TIMES_TO_RUN but the value is a multiple for how many times the test profile should be run respective to its default value. If the value is set to 2 and a given test profile by default is set to run 3 times, it would now instead be run a total of 6 times. This can be used for increasing the statistical significance of test results by using a multiple of the default rather than a static number as is the case with FORCE_TIMES_TO_RUN.*
+
+The value can be of type: positive integer.
+The variable is relevant for: test execution / benchmarking.
+
+
+### GRAPH_HIGHLIGHT
+*If automatically generating an HTML or PDF result file from the command-line and wanting to highlight desired result identifier(s), GRAPH_HIGHLIGHT can be set to a comma delimited list of result identifiers to highlight / color differently than the rest.*
+
+The value can be of type: string.
+The variable is relevant for: result output generation.
+
+
+### IGNORE_RUNS
+*This option can be used if wanting the Phoronix Test Suite to automatically toss out a specified result position when running a test profile multiple times. E.g. setting this value to 1 will toss out automatically the first run of each test profile or a value of 3 will toss out the third run of a given test. This overrides the IgnoreRuns option also available to individual test profiles. Multiple values for runs to ignore can be specified by delimiting with a comma.*
+
+The value can be of type: string.
+The variable is relevant for: test execution / benchmarking.
+
+
+### LIMIT_ELAPSED_TEST_TIME
+*This option can be used for limiting the amount of time the benchmarking process runs. The value specified is the number of minutes to allow for benchmarking. After a test finishes if that number of minutes has been exceeded, the testing process will abort early and not run any remaining tests.*
+
+The value can be of type: positive integer.
+The variable is relevant for: test execution / benchmarking.
+
+
+### LINUX_PERF
+*This option allows providing additional complementary per-test graphs looking at various Linux perf subsystem metrics such as cache usage, instructions executed, and other metrics. This requires you to have Linux's perf user-space utility already installed and performance counter access.*
+
+The value can be of type: boolean (TRUE / FALSE).
+The variable is relevant for: test execution / benchmarking.
+The variable depends upon functionality provided by the Phoronix Test Suite module: linux_perf.
+
+
+### MONITOR
+*This option can be used for system sensor monitoring during test execution. The Phoronix Test Suite system_monitor module can monitor various exposed sensors and record them as part of the result file and present them as additional graphs / metrics in the result viewer. The exposed sensors varies by platform hardware/software. This functionality also requires PHP PCNTL support and thus is not available for some platforms (i.e. Windows).*
+
+The value can be of type: enumeration (all, cpu.peak-freq, cpu.temp, cpu.power, cpu.usage, gpu.freq, gpu.power, gpu.temp, hdd.temp, memory.usage, swap.usage, sys.power, sys.temp)
+Multiple options can be supplied when delimited by a comma..
+The variable is relevant for: test execution / benchmarking.
+The variable depends upon functionality provided by the Phoronix Test Suite module: system_monitor.
+
+
+### NO_COLOR
+*This option when enabled will force-disable the CLI/TUI text coloring. By default the Phoronix Test Suite will attempt to use CLI/TUI text colors and bolding of text for supported terminals.*
+
+The value can be of type: boolean (TRUE / FALSE).
+
+
+### NO_COMPILER_MASK
+*By default the Phoronix Test Suite attempts to determine the intended system code compilers (namely C / C++ / Fortran) and to intercept the arguments being passed to them during test installation in order to record the prominent compiler flags being used. If this behavior causes problems for your system, NO_COMPILER_MASK can be enabled for debugging purposes to avoid this compiler intercepting/symlinking behavior.*
+
+The value can be of type: boolean (TRUE / FALSE).
+The variable is relevant for: test installation.
+
+
+### NO_DOWNLOAD_CACHE
+*Enable this option if the Phoronix Test Suite should not attempt to discover and use any local/remote Phoronix Test Suite download cache when installing tests and attempting to find those files locally or on a LAN resource.*
+
+The value can be of type: boolean (TRUE / FALSE).
+The variable is relevant for: test installation.
+
+
+### NO_EXTERNAL_DEPENDENCIES
+*Enabling this option will have the Phoronix Test Suite skip over attempting to detect and install any system/external dependencies needed to run desired test profiles. This should just be used in case of testing/evaluation purposes and may leave some tests unable to successfully build/install.*
+
+The value can be of type: boolean (TRUE / FALSE).
+The variable is relevant for: test installation.
+
+
+### NO_FILE_HASH_CHECKS
+*Enable this option if you want to skip the MD5 / SHA256 file hash checks after downloading files with known MD5/SHA256 hashsums for verification. This is namely useful for select debugging scenarios and other situations where a file may have been trivially changed / re-packaged and wishing to still install a test even though the hash no longer matches until the test profile has been updated.*
+
+The value can be of type: boolean (TRUE / FALSE).
+The variable is relevant for: test installation.
+
+
+### NO_HTTPS
+*Enable this option if wanting the Phoronix Test Suite when downloading resources to attempt to only use HTTP without any HTTPS connections. Note: some downloads may fail for servers that only support HTTPS.*
+
+The value can be of type: boolean (TRUE / FALSE).
+
+
+### NO_PHODEVI_CACHE
+*This option will disable use of the built-in Phodevi (Phoronix Device Interface) cache of system software/hardware details. When enabled, the information is not cached and will be re-computed on each query. This is mainly useful for debugging purposes.*
+
+The value can be of type: boolean (TRUE / FALSE).
+
+
+### OUTPUT_DIR
+*When exporting a result file, this option can be used for specifying the writable directory path where the exported result files should be saved to. The file-name will be automatically generated.*
+
+The value can be of type: string.
+The variable is relevant for: result output generation.
+
+
+### OUTPUT_FILE
+*When exporting a result file, this option can be used for specifying the file name / file path and name of where to save the exported result file to rather than assuming the user home directory.*
+
+The value can be of type: string.
+The variable is relevant for: result output generation.
+
+
+### PHODEVI_SANITIZE
+*This option can be used for stripping out part of a string on Phodevi (Phoronix Device Interface) hardware/software properties. Namely around the reported hardware/software information in result files if wanting any values / portions of strings stripped out from that information, such as for confidential hardware strings or other privacy concerns, PHODEVI_SANITIZE can be set. The value will be removed from read Phodevi hardware/software properties if set. Multiple strings to search for can be set by delimiting with a comma. If wanting to limit the sanitization to a particular property, the property value can be specified such as [property]=[value] to sanitisze like a value of "motherboard=ABCVENDOR" or CPU=ENGINEERING-SAMPLE to delete those strings rather than simply the string to remove that will look for matches in any property."*
+
+The value can be of type: string.
+
+
+### PRESET_OPTIONS
+*PRESET_OPTIONS can be used for seeding the values of test profile run options from the environment (though the preferred approach for pre-configuring tests in an automated manner would be by constructing your own local test suite).  For setting any test option(s) from an environment variable rather than being prompted for the options when running a test. Example: "PRESET_OPTIONS='stream.run-type=Add' phoronix-test-suite benchmark stream".*
+
+The value can be of type: string.
+The variable is relevant for: test execution / benchmarking.
+
+
+### PRESET_OPTIONS_VALUES
+*This option is similar to PRESET_OPTIONS and uses the same syntax but rather than seeding the selected run option it uses the value verbatim as for what is passed to the test profile run option.*
+
+The value can be of type: string.
+The variable is relevant for: test execution / benchmarking.
+
+
+### PTS_CONCURRENT_TEST_RUNS
+*This option is used in the stress run/benchmarking mode to indicate the number of tests to run concurrently as part of the stress run process.*
+
+The value can be of type: positive integer.
+The variable is relevant for: stress-run mode.
+
+
+### PTS_DISPLAY_MODE
+*If you wish to load a non-default display mode for a single instance, specify the mode in this variable as an alternative to adjusting the user configuration file.*
+
+The value can be of type: enumeration (BASIC, BATCH, CONCISE, SHORT, DEFAULT).
+
+
+### PTS_DOWNLOAD_CACHE
+*PTS_DOWNLOAD_CACHE can be used for setting a path to a directory on the system containing a Phoronix Test Suite download cache if located outside one of the default locations.*
+
+The value can be of type: string.
+The variable is relevant for: test installation.
+
+
+### PTS_EXTRA_SYSTEM_LOGS_DIR
+*By default the Phoronix Test Suite collects common system logs (cpuinfo, lscpu, dmesg) during the benchmarking process when saving test results. If wanting to collect additional, arbitrary system log files specific to your operating environment or for other niche system information, this option can be set as a path to a directory containing such log files. Prior to running the Phoronix Test Suite simply set PTS_EXTRA_SYSTEM_LOGS_DIR to the directory where any files should be captured from following test completion.*
+
+The value can be of type: string.
+The variable is relevant for: test execution / benchmarking.
+
+
+### PTS_IGNORE_MODULES
+*Enabling this option can be used for temporarily disabling Phoronix Test Suite modules from being loaded on a given run. This is primarily for debugging purposes.*
+
+The value can be of type: boolean (TRUE / FALSE).
+The variable is relevant for: modules.
+
+
+### PTS_MODULES
+*This option can be used for specifying a comma-separated list of Phoronix Test Suite modules to load at start-time, complementary to the modules specified in the user configuration file. PTS_MODULES is namely used for development purposes or wanting to temporarily enable a given module.*
+
+The value can be of type: string.
+The variable is relevant for: modules.
+
+
+### PTS_MODULE_SETUP
+*This option can be used for seeding a module's settings when running the phoronix-test-suite module-setup command. An example would be: "PTS_MODULE_SETUP='phoromatic.remote_host=http://www.phoromatic.com/; phoromatic.remote_account=123456; phoromatic.remote_verifier=ABCD' phoronix-test-suite module-setup phoromatic".*
+
+The value can be of type: string.
+The variable is relevant for: modules.
+
+
+### PTS_SILENT_MODE
+*This option when enabled will yield slightly less verbose Phoronix Test Suite terminal output by silencing unnecessary messages / prompts.*
+
+The value can be of type: boolean (TRUE / FALSE).
+
+
+### PTS_TEST_INSTALL_ROOT_PATH
+*This option can be used for overriding where tests are installed to on the system. An absolute writable directory path can be the value if wanting to override the default (or user configuration file specified) test installation directory path.*
+
+The value can be of type: string.
+The variable is relevant for: test installation, test execution / benchmarking, stress-run mode.
+
+
+### REMOVE_TESTS_OLDER_THAN
+*This option with the cleanup module can be used for automatically un-installing/removing installed tests if they have not been run in a period of time. The value for REMOVE_TESTS_OLDER_THAN is the number of days the test can be installed without running until this module will clean-up/remove older tests.*
+
+The value can be of type: positive integer.
+The variable is relevant for: test execution / benchmarking.
+The variable depends upon functionality provided by the Phoronix Test Suite module: cleanup.
+
+
+### REMOVE_TESTS_ON_COMPLETION
+*When this option is set to true, installed test profiles will be automatically removed/uninstalled when they are no longer in the current test execution queue. This is used for saving disk space / resources by automatically removing installed tests after they have been executed. For more persistent behavior is the RemoveTestInstallOnCompletion option within the Phoronix Test Suite user configuration file.*
+
+The value can be of type: boolean (TRUE / FALSE).
+The variable is relevant for: test execution / benchmarking.
+
+
+### SKIP_EXTERNAL_DEPENDENCIES
+*Rather than NO_EXTERNAL_DEPENDENCIES to outright disable the Phoronix Test Suite external dependency handling, SKIP_EXTERNAL_DEPENDENCIES can be used with a value of a comma separated list of specific external dependencies to avoid. This is mostly useful for any external dependencies that may be out of date or fail to install on your platform.*
+
+The value can be of type: string.
+The variable is relevant for: test installation.
+
+
+### SKIP_TESTING_SUBSYSTEMS
+*This option is similar to SKIP_TESTS but allows for specifying hardware subsystems (e.g. Graphics) to skip from installing/running any test profiles beloning to that subsystem type. Multiple subsystems can be specified when delimited by a comma.*
+
+The value can be of type: string.
+The variable is relevant for: test installation, test execution / benchmarking.
+
+
+### SKIP_TESTS
+*SKIP_TESTS will skip the test installation and execution of any test identifiers specified by this option. Multiple test identifiers can be specified, delimited by a comma.*
+
+The value can be of type: string.
+The variable is relevant for: test installation, test execution / benchmarking.
+
+
+### SKIP_TESTS_HAVING_ARGS
+*SKIP_TESTS_HAVING_ARGS will skip the test installation and execution of any tests where the specified test arguments match the given string. E.g. if wanting to skip all Vulkan tests in a result file but run just the OpenGL tests or similar where wanting to limit the tests being run from within a result file. Multiple values can be specified when delimited by a comma.*
+
+The value can be of type: string.
+The variable is relevant for: test installation, test execution / benchmarking.
+
+
+### SKIP_TEST_SUPPORT_CHECKS
+*This debugging/validation option will have the Phoronix Test Suite skip any test support checks for a test profile (architecture compatibility, OS compatibility, etc) and just assume all tests are supported.*
+
+The value can be of type: boolean (TRUE / FALSE).
+The variable is relevant for: test installation, test execution / benchmarking.
+
+
+### SORT_BY
+*This option can be used for specifying the sort order for commands like auto-sort-result-file whether to sort by identifier name, test length, etc.*
+
+**Default Value:** identifier
+
+The value can be of type: enumeration (date, date-asc, date-desc, identifier).
+
+
+### TERMINAL_WIDTH
+*This option is used for overriding the detected default of the terminal width for the CLI/TUI interface.*
+
+The value can be of type: positive integer.
+
+
+### TEST_EXECUTION_SORT
+*This option can be used for controlling the sort order that the test profiles / benchmarks are run in, whether sorted or not and in what manner.*
+
+The value can be of type: enumeration (none, random, dependencies, test-estimated-time, test-estimated-time-desc, test, default).
+The variable is relevant for: test execution / benchmarking.
+
+
+### TEST_EXEC_PREPEND
+*This option can be used if wanting to specify a binary (e.g. sudo, cgroup or other resource limiting binaries or performance counters) to be called as the binary pre-pended prior to running a test profile binary/script. This option is namely used for specialized use-cases.*
+
+The value can be of type: string.
+The variable is relevant for: test execution / benchmarking.
+
+
+### TEST_RESULTS_DESCRIPTION
+*This option can be used for specifying the result file description for saving that string and not be prompted for providing a description during the test execution process.*
+
+The value can be of type: string.
+The variable is relevant for: test execution / benchmarking, stress-run mode.
+
+
+### TEST_RESULTS_IDENTIFIER
+*This option can be used for specifying the result identifier for distinguishing this run within the saved result file.*
+
+The value can be of type: string.
+The variable is relevant for: test execution / benchmarking, stress-run mode.
+
+
+### TEST_RESULTS_NAME
+*This option can be used for specifying the result file name for saving the test/benchmark results automatically to the given name.*
+
+The value can be of type: string.
+The variable is relevant for: test execution / benchmarking, stress-run mode.
+
+
+### TEST_TIMEOUT_AFTER
+*When this variable is set, the value will can be set to "auto" or a positive integer. The value indicates the number of minutes until a test run should be aborted, such as for a safeguard against hung/deadlocked processes or other issues. Setting this to a high number as a backup would be recommended for fending off possible hangs / stalls in the testing process if the test does not quit. If the value is "auto", it will quit if the time of a test run exceeds 3x the average time it normally takes the particular test to complete its run. In the future, auto might be enabled by default in a future PTS release. This functionality requires system PHP PCNTL support (i.e. no Windows support).*
+
+The value can be of type: positive integer.
+The variable is relevant for: test execution / benchmarking.
+The variable depends upon functionality provided by the Phoronix Test Suite module: test_timeout.
+
+
+### TOTAL_LOOP_COUNT
+*This option is used to specify a multiple if wishing to run each test multiple times rather than just once per saved result file.*
+
+The value can be of type: positive integer.
+The variable is relevant for: test execution / benchmarking.
+
+
+### TOTAL_LOOP_TIME
+*This option is used to specify the amount of time (in minutes) to loop the testing during the Phoronix Test Suite stress run or normal benchmarking process.*
+
+The value can be of type: positive integer.
+The variable is relevant for: stress-run mode, test execution / benchmarking.
+
+
+### TURBOSTAT_LOG
+*This option allows attaching "turbostat" outputs to the end of archived benchmark/test log files if interested in the Linux TurboStat information. This assumes you have turbostat available on the Linux system(s) and have permissions (root) for running turbostat.*
+
+The value can be of type: boolean (TRUE / FALSE).
+The variable is relevant for: test execution / benchmarking.
+The variable depends upon functionality provided by the Phoronix Test Suite module: turbostat.
+
+
+### WATCHDOG_MAXIMUM_WAIT
+*Used in conjunction with the WATCHDOG_SENSOR option, this is the maximum amount of time to potentially wait when the watchdog is triggered for surpassing the threshold value. The value is the maximum number of minutes to wait being above the threshold.*
+
+The value can be of type: positive integer.
+The variable is relevant for: test execution / benchmarking.
+The variable depends upon functionality provided by the Phoronix Test Suite module: watchdog.
+
+
+### WATCHDOG_SENSOR
+*This option will enable the watchdog module that checks system sensor values pre/interim/post benchmark execution. If the selected sensor(s) exceed the static threshold level, testing will be paused before continuing to any additional tests so that the system can sleep. Ideally this will allow the system to return to a more suitable state before resuming testing after the sensor value is back below the threshold or after a pre-defined maximum time limit to spend sleeping. This module is mostly focused on pausing testing should system core temperatures become too elevated to allow time for heat dissipation.*
+
+The value can be of type: enumeration (cpu.temp, gpu.temp, hdd.temp, sys.temp)
+Multiple options can be supplied when delimited by a comma..
+The variable is relevant for: test execution / benchmarking.
+The variable depends upon functionality provided by the Phoronix Test Suite module: watchdog.
+
+
+### WATCHDOG_SENSOR_THRESHOLD
+*Used in conjunction with the WATCHDOG_SENSOR option, the WATCHDOG_SENSOR_THRESHOLD specifies the threshold for the sensor reading when the testing should be paused (e.g. the Celsius cut-off temperature).*
+
+The value can be of type: positive integer.
+The variable is relevant for: test execution / benchmarking.
+The variable depends upon functionality provided by the Phoronix Test Suite module: watchdog.
+
+
 # General Information
 
 ## Frequently Asked Questions
 **Q: May I use the Phoronix Test Suite when running benchmarks for my own publication or blog? Are there any publishing restrictions?**
 
-**A:** Anyone is more than welcome to use the Phoronix Test Suite for their own publication or purpose. While the Phoronix Test Suite came out of our internal test tools for carrying out Linux hardware reviews at [Phoronix.com](http://www.phoronix.com/) , we invite other hardware review web-sites, technology journals, and independent publications to use our software too. While not required, we would just kindly ask that you mention in your review/article that the *Phoronix Test Suite* was used for carrying out your testing, and ideally to link to [www.phoronix-test-suite.com](http://www.phoronix-test-suite.com/) so that your readers will know where to obtain the software if they are interested in running the tests. You are also more than welcome to upload your results to [OpenBenchmarking.org](http://www.openbenchmarking.org/) so that others may compare their results against yours in an easy manner.
+**A:** Anyone is more than welcome to use the Phoronix Test Suite for their own publication or purpose. While the Phoronix Test Suite came out of our internal test tools for carrying out Linux hardware reviews at [Phoronix.com](https://www.phoronix.com/) , we invite other hardware review web-sites, technology journals, and independent publications to use our software too. While not required, we would just kindly ask that you mention in your review/article that the *Phoronix Test Suite* was used for carrying out your testing, and ideally to link to [www.phoronix-test-suite.com](http://www.phoronix-test-suite.com/) so that your readers will know where to obtain the software if they are interested in running the tests. You are also more than welcome to upload your results to [OpenBenchmarking.org](http://www.openbenchmarking.org/) so that others may compare their results against yours in an easy manner.
 
 We also try to make the Phoronix Test Suite easy-to-use by independent publications. For example, if you would like to watermark your web-site's URL into the graphs containing your test results, that can be easily modified in *~/.phoronix-test-suite/graph-config.json* . The colors and other graph settings are also stored in this XML file. If you are a publication and run into any issues with the Phoronix Test Suite or have a feature request, please let us know.
 
@@ -1187,7 +1503,7 @@ We also try to make the Phoronix Test Suite easy-to-use by independent publicati
 
 **Q: Do you offer technical support for the Phoronix Test Suite**
 
-**A:** Paid, professional support is available and is done via [our commercial services](http://commercial.phoronix-test-suite.com/) . We also offer Phoromatic licenses for use within a corporate intranet and other custom services. Free, community support is offered via our [mailing list](http://phoronix-test-suite.com/mailman/listinfo/trondheim-pts_phoronix-test-suite.com) , IRC channel ( *#phoronix* on *FreeNode.net* , and [GitHub](https://github.com/phoronix-test-suite) .
+**A:** Paid, professional support is available and is done via [our commercial services](http://commercial.phoronix-test-suite.com/) . Free, community support is offered via [GitHub](https://github.com/phoronix-test-suite) .
 
 **Q: May I put the Phoronix Test Suite logo on my company's web-site or on my product packaging?**
 
@@ -1259,7 +1575,10 @@ Virtual test suites can be installed and run just like a normal XML test suite a
 
 
 ---
-#### All Tests In Pts  pts/all
+#### 64-bit Arm / AArch64 Tests In pts  pts/aarch64
+This is a collection of test profiles where there have been successful benchmark results submitted to OpenBenchmarking.org from 64-bit Arm / AArch64 CPU architecture hardware, i.e. these tests are proven to be 64-bit Arm / AArch64 compatible though not necessarily all compatible test profiles for the given architecture - just those with submitted public results previously on OpenBenchmarking.org.
+
+#### All Tests in pts  pts/all
 This is a collection of all supported test profiles found within the specified OpenBenchmarking.org repository.
 
 #### Application Tests  pts/application
@@ -1274,13 +1593,16 @@ This is a collection of test profiles having an external dependency on BLAS (Bas
 #### C++ Boost Tests  pts/boost
 This is a collection of test profiles having an external dependency on C++ Boost
 
-#### Bsd Operating System Tests  pts/bsd
+#### BSD Operating System Tests  pts/bsd
 This is a collection of test profiles found within the specified OpenBenchmarking.org repository where the test profile is specified as being compatible with the bsd Operating System.
+
+#### C/C++ Compiler Benchmark Workloads In pts  pts/compiler
+This is a collection of test profiles often useful for C/C++ compiler benchmarks and where the test profiles will respect CFLAGS/CXXFLAGS environment variables.
 
 #### Disk Subsystem Tests  pts/disk
 This is a collection of test profiles found within the specified OpenBenchmarking.org repository where the test profile is specified as being a test of the disk sub-system.
 
-#### Everything In Pts  pts/everything
+#### Everything in pts  pts/everything
 This is a collection of all test profiles found within the specified OpenBenchmarking.org repository, including unsupported tests, etc.
 
 #### Fortran Tests  pts/fortran
@@ -1313,6 +1635,9 @@ This is a collection of test profiles found within the specified OpenBenchmarkin
 #### Memory Subsystem Tests  pts/memory
 This is a collection of test profiles found within the specified OpenBenchmarking.org repository where the test profile is specified as being a test of the memory sub-system.
 
+#### Multi-Core/Multi-Threaded Workloads In pts  pts/multicore
+This is a collection of test profiles that have been detected to be CPU multi-threaded capable.
+
 #### Network Subsystem Tests  pts/network
 This is a collection of test profiles found within the specified OpenBenchmarking.org repository where the test profile is specified as being a test of the network sub-system.
 
@@ -1325,7 +1650,7 @@ This is a collection of test profiles having an external dependency on OpenCV
 #### Openmpi Tests  pts/openmpi
 This is a collection of test profiles found within the specified OpenBenchmarking.org repository where the test profile is specified via an internal tag as testing openmpi.
 
-#### Os Subsystem Tests  pts/os
+#### OS Subsystem Tests  pts/os
 This is a collection of test profiles found within the specified OpenBenchmarking.org repository where the test profile is specified as being a test of the os sub-system.
 
 #### Processor Subsystem Tests  pts/processor
@@ -1333,6 +1658,9 @@ This is a collection of test profiles found within the specified OpenBenchmarkin
 
 #### Python Tests  pts/python
 This is a collection of test profiles found within the specified OpenBenchmarking.org repository where the test profile is specified via an internal tag as testing python.
+
+#### RISC-V Tests In pts  pts/riscv
+This is a collection of test profiles where there have been successful benchmark results submitted to OpenBenchmarking.org from RISC-V CPU architecture hardware, i.e. these tests are proven to be RISC-V compatible though not necessarily all compatible test profiles for the given architecture - just those with submitted public results previously on OpenBenchmarking.org.
 
 #### Ruby Tests  pts/ruby
 This is a collection of test profiles having an external dependency on Ruby
@@ -1345,6 +1673,9 @@ This is a collection of test profiles found within the specified OpenBenchmarkin
 
 #### Simulator Tests  pts/simulator
 This is a collection of test profiles found within the specified OpenBenchmarking.org repository where the test profile is specified as being a simulator software test.
+
+#### Single-Threaded Workloads In pts  pts/single-threaded
+This is a collection of test profiles that have been detected to be single-threaded or only very poorly CPU threaded.
 
 #### Solaris Operating System Tests  pts/solaris
 This is a collection of test profiles found within the specified OpenBenchmarking.org repository where the test profile is specified as being compatible with the solaris Operating System.
@@ -1394,7 +1725,10 @@ This is a collection of test profiles found within the specified OpenBenchmarkin
 #### Responsiveness Tests  pts/responsiveness
 This is a collection of test profiles found within the specified OpenBenchmarking.org repository where the test profile is specified via an internal tag as testing responsiveness.
 
-#### All Tests In System  system/all
+#### 64-bit Arm / AArch64 Tests In system  system/aarch64
+This is a collection of test profiles where there have been successful benchmark results submitted to OpenBenchmarking.org from 64-bit Arm / AArch64 CPU architecture hardware, i.e. these tests are proven to be 64-bit Arm / AArch64 compatible though not necessarily all compatible test profiles for the given architecture - just those with submitted public results previously on OpenBenchmarking.org.
+
+#### All Tests in system  system/all
 This is a collection of all supported test profiles found within the specified OpenBenchmarking.org repository.
 
 #### Application Tests  system/application
@@ -1409,13 +1743,13 @@ This is a collection of test profiles having an external dependency on BLAS (Bas
 #### C++ Boost Tests  system/boost
 This is a collection of test profiles having an external dependency on C++ Boost
 
-#### Bsd Operating System Tests  system/bsd
+#### BSD Operating System Tests  system/bsd
 This is a collection of test profiles found within the specified OpenBenchmarking.org repository where the test profile is specified as being compatible with the bsd Operating System.
 
 #### Disk Subsystem Tests  system/disk
 This is a collection of test profiles found within the specified OpenBenchmarking.org repository where the test profile is specified as being a test of the disk sub-system.
 
-#### Everything In System  system/everything
+#### Everything in system  system/everything
 This is a collection of all test profiles found within the specified OpenBenchmarking.org repository, including unsupported tests, etc.
 
 #### Game Tests  system/game
@@ -1445,6 +1779,9 @@ This is a collection of test profiles found within the specified OpenBenchmarkin
 #### Python Tests  system/python
 This is a collection of test profiles having an external dependency on Python
 
+#### RISC-V Tests In system  system/riscv
+This is a collection of test profiles where there have been successful benchmark results submitted to OpenBenchmarking.org from RISC-V CPU architecture hardware, i.e. these tests are proven to be RISC-V compatible though not necessarily all compatible test profiles for the given architecture - just those with submitted public results previously on OpenBenchmarking.org.
+
 #### Scientific Tests  system/scientific
 This is a collection of test profiles found within the specified OpenBenchmarking.org repository where the test profile is specified as being a scientific software test.
 
@@ -1469,13 +1806,13 @@ This is a collection of test profiles found within the specified OpenBenchmarkin
 #### Smp Tests  system/smp
 This is a collection of test profiles found within the specified OpenBenchmarking.org repository where the test profile is specified via an internal tag as testing smp.
 
-#### All Tests In Git  git/all
+#### All Tests in git  git/all
 This is a collection of all supported test profiles found within the specified OpenBenchmarking.org repository.
 
-#### Bsd Operating System Tests  git/bsd
+#### BSD Operating System Tests  git/bsd
 This is a collection of test profiles found within the specified OpenBenchmarking.org repository where the test profile is specified as being compatible with the bsd Operating System.
 
-#### Everything In Git  git/everything
+#### Everything in git  git/everything
 This is a collection of all test profiles found within the specified OpenBenchmarking.org repository, including unsupported tests, etc.
 
 #### Linux Operating System Tests  git/linux
@@ -1560,7 +1897,7 @@ Further configuration of the setup parameters for the Phoromatic Server and Phor
 
 The Phoromatic Server utilizes PHP's built-in web-server capabilities and there's also a Phoronix Test Suite built-in WebSocket server that's also initiated for back-end processing. At this time there are no ports set by default for these services but must be defined within the user configuration file. With the Avahi zero-conf network discovery and other automated detection in place, there's little restrictions over the port selection.
 
-Systemd and Upstart service files are shipped with the Phoronix Test Suite for those that wish to have the services automatically run as daemons. The only new requirements over the basic Phoronix Test Suite system requirements is having PHP-SQLite support installed and the newer version of PHP is recommended for offering the best support.
+Systemd service files are shipped with the Phoronix Test Suite for those that wish to have the services automatically run as daemons. The only new requirements over the basic Phoronix Test Suite system requirements is having PHP-SQLite support installed and the newer version of PHP is recommended for offering the best support.
 
 
 ### Example Deployments
@@ -1628,8 +1965,8 @@ If you have an Internet connection but want to ensure your Phoronix Test Suite c
 #### Ports / Services
 The Phoromatic Server process currently relies upon a PHP built-in web server process and a PTS-hosted WebSocket server. The web server process handles the web UI and much of the responsibilities of the Phoromatic Server. Over time the PTS WebSocket server will be increasingly utilized for bi-directional, real-time communication between the server and clients -- including for features like viewing real-time hardware sensors of client systems from the server UI.
 
-#### Systemd / Upstart
-Packaged with the Phoronix Test Suite are basic *phoromatic-client* and *phoromatic-server* configurations for both Upstart and systemd init systems. The *phoromatic-server* configuration will launch the Phoronix Test Suite's Phoromatic Server and the *phoromatic-client* service will attempt to connect to a _pre-configured_ Phoromatic Server. The systemd service files will automatically be installed via the Phoronix Test Suite *install-sh* process while the Upstart jobs can be copied from *deploy/phoromatic-upstart/** to */etc/init* .
+#### Systemd
+Packaged with the Phoronix Test Suite are basic *phoromatic-client* and *phoromatic-server* configurations for systemd. The *phoromatic-server* configuration will launch the Phoronix Test Suite's Phoromatic Server and the *phoromatic-client* service will attempt to connect to a _pre-configured_ Phoromatic Server. The systemd service files will automatically be installed via the Phoronix Test Suite *install-sh* process.
 
 #### Cache Verification
 To confirm the files accessible to Phoronix Test Suite client systems, from the Phoromatic Server web user-interface go to the *settings* page followed by the *cache settings* link to view information about the download and OpenBenchmarking.org caches. From the client systems, running **phoronix-test-suite phoromatic.explore** will also supply cache statistics.

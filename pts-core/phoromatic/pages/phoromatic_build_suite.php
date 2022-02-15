@@ -3,8 +3,8 @@
 /*
 	Phoronix Test Suite
 	URLs: http://www.phoronix.com, http://www.phoronix-test-suite.com/
-	Copyright (C) 2015 - 2018, Phoronix Media
-	Copyright (C) 2015 - 2018, Michael Larabel
+	Copyright (C) 2015 - 2022, Phoronix Media
+	Copyright (C) 2015 - 2022, Michael Larabel
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 	You should have received a copy of the GNU General Public License
 	along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
-
 
 class phoromatic_build_suite implements pts_webui_interface
 {
@@ -39,17 +38,20 @@ class phoromatic_build_suite implements pts_webui_interface
 	{
 		if(isset($_POST['suite_title']))
 		{
-		//	echo '<pre>';
-		//	var_dump($_POST);
-		//	echo '</pre>';
+			phoromatic_quit_if_invalid_input_found(array('suite_title', 'test_add', 'suite_version', 'suite_description'));
+			$proceed = true;
 
-			if(strlen($_POST['suite_title']) < 3)
+			if(strlen($_POST['suite_title']) < 3 || pts_strings::keep_in_string($_POST['suite_title'], pts_strings::CHAR_LETTER | pts_strings::CHAR_NUMERIC | pts_strings::CHAR_DASH) != $_POST['suite_title'])
 			{
-				echo '<h2>Suite title must be at least three characters.</h2>';
+				echo '<h2>Suite title must be at least three characters and contain just alpha-numeric characters and dashes allowed.</h2>';
+				$proceed = false;
+			}
+			if(!isset($_POST['suite_version']) || empty($_POST['suite_version']) || !pts_strings::is_version($_POST['suite_version']))
+			{
+				echo '<h2>Suite version must be valid numeric version format X.Y.Z.</h2>';
+				$proceed = false;
 			}
 
-			//echo 'TEST SUITE: ' . $_POST['suite_title'] . '<br />';
-			//echo 'TEST SUITE: ' . $_POST['suite_description'] . '<br />';
 			$tests = array();
 
 			foreach($_POST['test_add'] as $i => $test_identifier)
@@ -62,6 +64,7 @@ class phoromatic_build_suite implements pts_webui_interface
 				{
 					if(strpos($i, $test_prefix) !== false && substr($i, -9) != '_selected')
 					{
+						phoromatic_quit_if_invalid_input_found(array($i, $i . '_selected'));
 						if(strpos($v, '||') !== false)
 						{
 							$opts = explode('||', $v);
@@ -98,40 +101,44 @@ class phoromatic_build_suite implements pts_webui_interface
 			if(count($tests) < 1)
 			{
 				echo '<h2>You must add at least one test to the suite.</h2>';
+				$proceed = false;
 			}
 
-			$new_suite = new pts_test_suite();
-			$version_bump = 0;
-
-		//	do
-		//	{
-				//$suite_version = '1.' . $version_bump . '.0';
-				$suite_version = $_POST['suite_version'];
-				$suite_id = $new_suite->clean_save_name_string($_POST['suite_title']) . '-' . $suite_version;
-				$suite_dir = phoromatic_server::phoromatic_account_suite_path($_SESSION['AccountID'], $suite_id);
-		//		$version_bump++;
-		//	}
-		//	while(is_dir($suite_dir));
-			pts_file_io::mkdir($suite_dir);
-			$save_to = $suite_dir . '/suite-definition.xml';
-
-			$new_suite->set_title($_POST['suite_title']);
-			$new_suite->set_version($suite_version); // $suite_version
-			$new_suite->set_maintainer($_SESSION['UserName']);
-			$new_suite->set_suite_type('System');
-			$new_suite->set_description($_POST['suite_description']);
-
-			foreach($tests as $m)
+			if($proceed)
 			{
-				$new_suite->add_to_suite($m['test'], $m['args'], $m['description']);
-			}
+				$new_suite = new pts_test_suite();
+				$version_bump = 0;
 
-			$new_suite->save_xml(null, $save_to);
-			echo '<h2>Saved As ' . $suite_id . '</h2>';
+			//	do
+			//	{
+					//$suite_version = '1.' . $version_bump . '.0';
+					$suite_version = $_POST['suite_version'];
+					$suite_id = $new_suite->clean_save_name_string($_POST['suite_title']) . '-' . $suite_version;
+					$suite_dir = phoromatic_server::phoromatic_account_suite_path($_SESSION['AccountID'], $suite_id);
+			//		$version_bump++;
+			//	}
+			//	while(is_dir($suite_dir));
+				pts_file_io::mkdir($suite_dir);
+				$save_to = $suite_dir . '/suite-definition.xml';
+
+				$new_suite->set_title($_POST['suite_title']);
+				$new_suite->set_version($suite_version); // $suite_version
+				$new_suite->set_maintainer($_SESSION['UserName']);
+				$new_suite->set_suite_type('System');
+				$new_suite->set_description($_POST['suite_description']);
+
+				foreach($tests as $m)
+				{
+					$new_suite->add_to_suite($m['test'], $m['args'], $m['description']);
+				}
+
+				$new_suite->save_xml(null, $save_to);
+				echo '<h2>Saved As ' . $suite_id . '</h2>';
+				phoromatic_add_activity_stream_event('suite', $suite_id, 'added');
+			}
 		}
 		echo phoromatic_webui_header_logged_in();
 		$main = '<h1>Local Suites</h1><p>Find already created local test suites by your account/group via the <a href="/?local_suites">local suites</a> page.</p>';
-
 
 		if(!PHOROMATIC_USER_IS_VIEWER)
 		{
@@ -172,7 +179,7 @@ class phoromatic_build_suite implements pts_webui_interface
 				$cache_json = file_get_contents($dc . 'pts-download-cache.json');
 				$cache_json = json_decode($cache_json, true);
 			}
-			foreach(array_merge(pts_tests::local_tests(), pts_openbenchmarking::available_tests(false, true)) as $test)
+			foreach(array_merge(pts_tests::local_tests(), pts_openbenchmarking::available_tests(false, isset($_COOKIE['list_show_all_test_versions']) && $_COOKIE['list_show_all_test_versions'])) as $test)
 			{
 				$cache_checked = false;
 				if(phoromatic_server::read_setting('show_local_tests_only'))
@@ -196,9 +203,9 @@ class phoromatic_build_suite implements pts_webui_interface
 				$main .= '<option value="' . $test . '">' . $test . '</option>';
 			}
 			$main .= '</select>';
+			$main .= pts_web_embed::cookie_checkbox_option_helper('list_show_all_test_versions', 'Show all available test profile versions.');
 			$main .= '<p align="right"><input name="submit" value="' . ($suite->get_title() != null ? 'Edit' : 'Create') .' Suite" type="submit" onclick="return pts_rmm_validate_suite();" /></p>';
 		}
-
 		echo '<div id="pts_phoromatic_main_area">' . $main . '</div>';
 		echo phoromatic_webui_footer();
 	}

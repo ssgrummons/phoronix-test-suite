@@ -4,8 +4,8 @@
 /*
 	Phoronix Test Suite
 	URLs: http://www.phoronix.com, http://www.phoronix-test-suite.com/
-	Copyright (C) 2008 - 2021, Phoronix Media
-	Copyright (C) 2008 - 2021, Michael Larabel
+	Copyright (C) 2008 - 2022, Phoronix Media
+	Copyright (C) 2008 - 2022, Michael Larabel
 	phodevi_system.php: The PTS Device Interface object for the system software
 
 	This program is free software; you can redistribute it and/or modify
@@ -397,10 +397,10 @@ class phodevi_system extends phodevi_device_interface
 		else if(phodevi::is_windows())
 		{
 			// TODO could use better detection to verify if C: or the desired disk under test... but most of the time will be NTFS anyways
-			$fs = filter_var(trim(shell_exec('powershell "(Get-WMIObject -Class Win32_Volume | Select DriveLetter,FreeSpace,Capacity,DeviceID,Label,@{Name=\"FileSystemType\";Expression={$_.\"FileSystem\"}})[1].FileSystemType"')), FILTER_UNSAFE_RAW, FILTER_FLAG_STRIP_HIGH);
+			$fs = filter_var(trim(shell_exec('powershell -NoProfile "(Get-WMIObject -Class Win32_Volume | Select DriveLetter,FreeSpace,Capacity,DeviceID,Label,@{Name=\"FileSystemType\";Expression={$_.\"FileSystem\"}})[1].FileSystemType"')), FILTER_UNSAFE_RAW, FILTER_FLAG_STRIP_HIGH);
 			if(empty($fs) || $fs == 'Unknown' || $fs == 'FAT32')
 			{
-				$fs = filter_var(trim(shell_exec('powershell "(Get-WMIObject -Class Win32_Volume | Select DriveLetter,FreeSpace,Capacity,DeviceID,Label,@{Name=\"FileSystemType\";Expression={$_.\"FileSystem\"}})[0].FileSystemType"')),FILTER_UNSAFE_RAW, FILTER_FLAG_STRIP_HIGH);
+				$fs = filter_var(trim(shell_exec('powershell -NoProfile "(Get-WMIObject -Class Win32_Volume | Select DriveLetter,FreeSpace,Capacity,DeviceID,Label,@{Name=\"FileSystemType\";Expression={$_.\"FileSystem\"}})[0].FileSystemType"')),FILTER_UNSAFE_RAW, FILTER_FLAG_STRIP_HIGH);
 			}
 
 			// Fallback for Windows 8
@@ -652,7 +652,7 @@ class phodevi_system extends phodevi_device_interface
 		}
 		else if(phodevi::is_windows())
 		{
-			$mds_tool = getenv('USERPROFILE') . '\Downloads\mdstool-cli.exe';
+			$mds_tool = microsoft_dependency_handler::file_download_location() . 'mdstool-cli.exe';
 			if(is_file($mds_tool))
 			{
 				$mds_output = preg_replace('#\\x1b[[][^A-Za-z]*[A-Za-z]#', '', shell_exec($mds_tool));
@@ -663,6 +663,37 @@ class phodevi_system extends phodevi_device_interface
 					{
 						$security[] = $check;
 					}
+				}
+			}
+
+			// Windows 10+ security features: VBS, HVCI
+			// https://docs.microsoft.com/en-us/windows/security/threat-protection/device-guard/enable-virtualization-based-protection-of-code-integrity#virtualizationbasedsecuritystatus
+			$vbs_status = trim(shell_exec('powershell -NoProfile "(Get-CimInstance -ErrorAction SilentlyContinue –ClassName Win32_DeviceGuard –Namespace root\Microsoft\Windows\DeviceGuard).VirtualizationBasedSecurityStatus"'));
+			switch($vbs_status) {
+				case '0':
+					$security[] = 'VBS: Disabled';
+					break;
+				case '1':
+					$security[] = 'VBS: Enabled but not running';
+					break;
+				case '2':
+					$security[] = 'VBS: Enabled and running';
+					break;
+			}
+
+			// https://docs.microsoft.com/en-us/windows/security/threat-protection/device-guard/enable-virtualization-based-protection-of-code-integrity#securityservicesconfigured
+			$security_services_running = preg_split('/\r\n|\n|\r/', trim(shell_exec('powershell -NoProfile "(Get-CimInstance -ErrorAction SilentlyContinue –ClassName Win32_DeviceGuard –Namespace root\Microsoft\Windows\DeviceGuard).SecurityServicesRunning"')));
+			if(in_array('2', $security_services_running)) {
+				$security[] = 'HVCI: Running';
+
+				// Mode Based Execution Control (MBEC) is relevant to HVCI performance and is available in Intel Kaby Lake and newer and AMD Zen 2 and newer
+				// https://docs.microsoft.com/en-us/windows/security/threat-protection/device-guard/enable-virtualization-based-protection-of-code-integrity#hvci-features
+				// https://docs.microsoft.com/en-us/windows/security/threat-protection/device-guard/enable-virtualization-based-protection-of-code-integrity#availablesecurityproperties
+				$available_security_properties = preg_split('/\r\n|\n|\r/', trim(shell_exec('powershell -NoProfile "(Get-CimInstance -ErrorAction SilentlyContinue –ClassName Win32_DeviceGuard –Namespace root\Microsoft\Windows\DeviceGuard).AvailableSecurityProperties"')));
+				if(in_array('7', $available_security_properties)) {
+					$security[] = 'MBEC: Available';
+				} else {
+					$security[] = 'MBEC: Unavailable';
 				}
 			}
 		}
@@ -969,9 +1000,9 @@ class phodevi_system extends phodevi_device_interface
 		}
 
 		// Try to make the compiler that's used by default to appear first
-		if(pts_client::read_env('CC') && isset($compilers[basename(pts_strings::first_in_string(pts_client::read_env('CC'), ' '))]))
+		if(getenv('CC') && isset($compilers[basename(pts_strings::first_in_string(getenv('CC'), ' '))]))
 		{
-			$cc_env = basename(pts_strings::first_in_string(pts_client::read_env('CC'), ' '));
+			$cc_env = basename(pts_strings::first_in_string(getenv('CC'), ' '));
 			$default_compiler = $compilers[$cc_env];
 			unset($compilers[$cc_env]);
 			array_unshift($compilers, $default_compiler);
@@ -983,7 +1014,7 @@ class phodevi_system extends phodevi_device_interface
 			if(isset($compilers[$cc_link]))
 			{
 				$default_compiler = $compilers[$cc_link];
-				unset($compilers[pts_client::read_env('CC')]);
+				unset($compilers[getenv('CC')]);
 				array_unshift($compilers, $default_compiler);
 			}
 		}
@@ -1018,7 +1049,37 @@ class phodevi_system extends phodevi_device_interface
 	}
 	public static function sw_kernel()
 	{
-		return php_uname('r');
+		if(phodevi::is_windows())
+		{
+			// CurrentBuild and CurrentVersion are available since at least NT 4.0
+			// CurrentVersion is frozen at 6.3 (same as Windows 8.1) in Windows 10 & 11
+			$current_build = trim(shell_exec('powershell -NoProfile "If (Get-ItemProperty -ErrorAction SilentlyContinue -Path \'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\' CurrentBuild) { (Get-ItemProperty -Path \'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\' CurrentBuild).CurrentBuild } Else { $null }"'));
+
+			// Windows 10 and later add CurrentMajorVersionNumber, CurrentMinorVersionNumber and UBR
+			$current_major_version_number = trim(shell_exec('powershell -NoProfile "If (Get-ItemProperty -ErrorAction SilentlyContinue -Path \'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\' CurrentMajorVersionNumber) { (Get-ItemProperty -Path \'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\' CurrentMajorVersionNumber).CurrentMajorVersionNumber } Else { $null }"'));
+
+			// Try using Windows 10+ values
+			if (is_numeric($current_major_version_number)) {
+				$current_minor_version_number = trim(shell_exec('powershell -NoProfile "If (Get-ItemProperty -ErrorAction SilentlyContinue -Path \'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\' CurrentMinorVersionNumber) { (Get-ItemProperty -Path \'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\' CurrentMinorVersionNumber).CurrentMinorVersionNumber } Else { $null }"'));
+				$update_build_revision = trim(shell_exec('powershell -NoProfile "If (Get-ItemProperty -ErrorAction SilentlyContinue -Path \'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\' UBR) { (Get-ItemProperty -Path \'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\' UBR).UBR } Else { $null }"'));
+
+				if(is_numeric($current_minor_version_number) && is_numeric($current_build) && is_numeric($update_build_revision)) {
+					return $current_major_version_number . '.' . $current_minor_version_number . '.' . $current_build . '.' . $update_build_revision;
+				}
+			}
+
+			// Fall back to Windows 8.1 and earlier values
+			$current_version = trim(shell_exec('powershell -NoProfile "If (Get-ItemProperty -ErrorAction SilentlyContinue -Path \'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\' CurrentVersion) { (Get-ItemProperty -Path \'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\' CurrentVersion).CurrentVersion } Else { $null }"'));
+
+			if(is_numeric($current_version) && is_numeric($current_build)) {
+				return $current_version . '.' . $current_build;
+			}
+
+			// Fall back to PHP implementation
+			return php_uname('r');
+		} else {
+			return php_uname('r');
+		}
 	}
 	public static function sw_kernel_parameters()
 	{
@@ -1310,7 +1371,7 @@ class phodevi_system extends phodevi_device_interface
 		$desktop = null;
 		$desktop_environment = null;
 		$desktop_version = null;
-		$desktop_session = pts_client::read_env('DESKTOP_SESSION');
+		$desktop_session = getenv('DESKTOP_SESSION');
 
 		if(pts_client::is_process_running('gnome-shell'))
 		{
@@ -1808,7 +1869,12 @@ class phodevi_system extends phodevi_device_interface
 			{
 				$llvm = substr($renderer, $s);
 				$llvm = substr($llvm, 0, strpos($llvm, ')'));
-				$info .= ' (' . $llvm . ')';
+				if(!empty($llvm) && phodevi::read_property('system', 'kernel'))
+				{
+					// Mesa Oibaf PPA for example includes kernel version but not important since PTS already reports kernel
+					$llvm = str_replace(array(',', phodevi::read_property('system', 'kernel')), '', $llvm);
+				}
+				$info .= ' (' . trim($llvm) . ')';
 			}
 		}
 
@@ -2107,9 +2173,9 @@ class phodevi_system extends phodevi_device_interface
 		{
 			$wine_version = trim(shell_exec('wine --version 2>&1'));
 		}
-		else if(pts_client::executable_in_path('winecfg.exe') != false && pts_client::read_env('WINE_VERSION'))
+		else if(pts_client::executable_in_path('winecfg.exe') != false && getenv('WINE_VERSION'))
 		{
-			$wine_version = trim(pts_client::read_env('WINE_VERSION'));
+			$wine_version = trim(getenv('WINE_VERSION'));
 
 			if(stripos($wine_version, 'wine') === false)
 			{

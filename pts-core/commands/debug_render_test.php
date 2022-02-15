@@ -67,7 +67,9 @@ class debug_render_test implements pts_option_interface
 				{
 					// Add to result file
 					$system_name = basename(dirname($composite_xml)) . ': ' . $trigger;
-					$result_files[] = new pts_result_merge_select($composite_xml, null, $system_name);
+					$rf = new pts_result_file($composite_xml);
+					$rf->rename_run(null, $system_name);
+					$result_files[] = $rf;
 				}
 			}
 			echo 'STARTING MERGE; ';
@@ -109,7 +111,7 @@ class debug_render_test implements pts_option_interface
 			foreach(pts_results::saved_test_results() as $saved_result)
 			{
 				$save_to_dir = pts_client::setup_test_result_directory($saved_result);
-				$generated_graphs = pts_client::generate_result_file_graphs($saved_result, $save_to_dir, $extra_graph_attributes);
+				$generated_graphs = pts_svg_dom_gd::generate_result_file_graphs($saved_result, $save_to_dir, $extra_graph_attributes);
 				echo $saved_result . ': ' . count($generated_graphs) . PHP_EOL;
 			}
 		}

@@ -32,7 +32,7 @@ class timed_screenshot extends pts_module_interface
 	protected static $screenshot_interval = 10;
 	protected static $existing_screenshots = array();
 
-	public static function module_environmental_variables()
+	public static function module_environment_variables()
 	{
 		return array('SCREENSHOT_INTERVAL');
 	}
@@ -47,7 +47,7 @@ class timed_screenshot extends pts_module_interface
 			return pts_module::MODULE_UNLOAD;
 		}
 
-		if(($interval = pts_module::read_variable('SCREENSHOT_INTERVAL')) > 1 && is_numeric($interval))
+		if(($interval = pts_env::read('SCREENSHOT_INTERVAL')) > 1 && is_numeric($interval))
 		{
 			self::$screenshot_interval = $interval;
 			return true;

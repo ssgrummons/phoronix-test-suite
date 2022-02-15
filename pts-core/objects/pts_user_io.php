@@ -113,11 +113,11 @@ class pts_user_io
 
 		for($r = 0; $r < count($table); $r++)
 		{
-			for($c = 0; $c < count($table[$r]); $c++)
+			for($c = 0; is_array($table[$r]) && $c < count($table[$r]); $c++)
 			{
 				if(!isset($column_widths[$c]) || isset($table[$r][$c][$column_widths[$c]]))
 				{
-					$column_widths[$c] = strlen($table[$r][$c]);
+					$column_widths[$c] = $table[$r][$c] == null ? 0 : strlen($table[$r][$c]);
 				}
 			}
 		}
@@ -125,7 +125,7 @@ class pts_user_io
 		for($r = 0; $r < count($table); $r++)
 		{
 			$line = null;
-			for($c = 0; $c < count($table[$r]); $c++)
+			for($c = 0; is_array($table[$r]) && $c < count($table[$r]); $c++)
 			{
 				if($border)
 				{

@@ -269,11 +269,6 @@ class pts_test_profile_parser
 	{
 		return $this->xg('TestInformation/Title');
 	}
-	public function get_dependencies()
-	{
-		// XXX should be using get_external_dependencies instead, TODO remove with PTS 6.2
-		return $this->get_external_dependencies();
-	}
 	public function get_external_dependencies()
 	{
 		return pts_strings::comma_explode($this->xg('TestProfile/ExternalDependencies'));
@@ -361,7 +356,8 @@ class pts_test_profile_parser
 	}
 	public function get_result_scale_formatted()
 	{
-		return trim(pts_strings::first_in_string($this->get_result_scale(), '|'));
+		$fmt = pts_strings::first_in_string($this->get_result_scale(), '|');
+		return empty($fmt) ? '' : trim($fmt);
 	}
 	public function get_result_scale_shortened()
 	{

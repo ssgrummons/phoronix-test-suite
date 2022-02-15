@@ -44,7 +44,6 @@ class pts_test_run_manager
 	protected $pre_run_message = null;
 	protected $allow_sharing_of_results = true;
 	protected $auto_upload_to_openbenchmarking = false;
-	protected $is_pcqs = false;
 	protected $openbenchmarking_results_data = false;
 
 	protected $do_dynamic_run_count = false;
@@ -63,10 +62,11 @@ class pts_test_run_manager
 	public $DEBUG_no_test_execution_just_result_parse = false;
 	public $benchmark_log = null;
 	public $test_run_success_counter = 0;
+	public $remove_tests_on_completion = false;
 
 	public function __construct($batch_mode = false, $auto_mode = false)
 	{
-		$this->do_dynamic_run_count = pts_config::read_bool_config('PhoronixTestSuite/Options/TestResultValidation/DynamicRunCount', 'TRUE') && getenv('FORCE_TIMES_TO_RUN') == false;
+		$this->do_dynamic_run_count = pts_config::read_bool_config('PhoronixTestSuite/Options/TestResultValidation/DynamicRunCount', 'TRUE') && pts_env::read('FORCE_TIMES_TO_RUN') == false;
 		$this->dynamic_run_count_on_length_or_less = 60; //pts_config::read_user_config('PhoronixTestSuite/Options/TestResultValidation/LimitIncreasingRunCountForTestsOverLength', 60);
 		$this->dynamic_run_count_std_deviation_threshold = pts_config::read_user_config('PhoronixTestSuite/Options/TestResultValidation/StandardDeviationThreshold', 3.0);
 		$this->dynamic_run_count_export_script = pts_config::read_user_config('PhoronixTestSuite/Options/TestResultValidation/ExportResultsTo', null);
@@ -82,16 +82,13 @@ class pts_test_run_manager
 		$this->auto_mode = $auto_mode;
 		$this->benchmark_log = new pts_logger(null, 'phoronix-test-suite-benchmark.log');
 		$this->test_run_success_counter = 0;
+		$this->remove_tests_on_completion = pts_config::read_bool_config('PhoronixTestSuite/Options/Testing/RemoveTestInstallOnCompletion', 'FALSE') || pts_env::read('REMOVE_TESTS_ON_COMPLETION');
 
 		pts_module_manager::module_process('__run_manager_setup', $this);
 	}
 	public function is_interactive_mode()
 	{
 		return $this->auto_mode == false && $this->batch_mode == false;
-	}
-	public function is_pcqs()
-	{
-		return $this->is_pcqs;
 	}
 	public function do_dynamic_run_count()
 	{
@@ -136,11 +133,11 @@ class pts_test_run_manager
 			}
 		}
 
-		if($time_test_started && ($min_duration = getenv('FORCE_MIN_DURATION_PER_TEST')) != false)
+		if($time_test_started && ($min_duration = pts_env::read('FORCE_MIN_DURATION_PER_TEST')) != false && is_numeric($min_duration) && is_numeric($min_duration) > 0)
 		{
 			// FORCE_MIN_DURATION_PER_TEST if wanting to force a test to run at least for a given amount of time (minutes)
 			$time_test_elapsed_so_far = microtime(true) - $time_test_started;
-			if(is_numeric($min_duration) && $time_test_elapsed_so_far < ($min_duration * 60))
+			if($time_test_elapsed_so_far < ($min_duration * 60))
 			{
 				return true;
 			}
@@ -247,7 +244,7 @@ class pts_test_run_manager
 
 		if(!isset($this->hashes_of_tests_to_run[$hash]))
 		{
-			if(!$test_result->test_profile->is_test_installed())
+			if($test_result->test_profile->test_installation == false || $test_result->test_profile->test_installation->is_installed() == false)
 			{
 				// Test is not installed, see if should upgrade to new minor release
 				$tp = pts_openbenchmarking_client::test_profile_newer_minor_version_available($test_result->test_profile);
@@ -405,7 +402,7 @@ class pts_test_run_manager
 		// Prompt to save a file when running a test
 		$save_name = null;
 
-		if(($env = pts_client::read_env('TEST_RESULTS_NAME')))
+		if(($env = pts_env::read('TEST_RESULTS_NAME')))
 		{
 			$save_name = $env;
 			//echo 'Saving Results To: ' . $proposed_name . PHP_EOL;
@@ -509,7 +506,7 @@ class pts_test_run_manager
 			$times_tried = 0;
 			do
 			{
-				if($times_tried == 0 && ($env_identifier = pts_client::read_env('TEST_RESULTS_IDENTIFIER')))
+				if($times_tried == 0 && ($env_identifier = pts_env::read('TEST_RESULTS_IDENTIFIER')))
 				{
 					$results_identifier = isset($env_identifier) ? self::clean_results_identifier($env_identifier) : null;
 					echo 'Test Identifier: ' . $results_identifier . PHP_EOL;
@@ -535,7 +532,7 @@ class pts_test_run_manager
 			}
 			while((!$no_repeated_tests && $identifier_pos != -1) || (isset($current_hardware[$identifier_pos]) && $current_hardware[$identifier_pos] != phodevi::system_hardware(true)) || (isset($current_software[$identifier_pos]) && $current_software[$identifier_pos] != phodevi::system_software(true)));
 		}
-		else if(($env_identifier = pts_client::read_env('TEST_RESULTS_IDENTIFIER')))
+		else if(($env_identifier = pts_env::read('TEST_RESULTS_IDENTIFIER')))
 		{
 			$results_identifier = self::clean_results_identifier($env_identifier);
 		}
@@ -646,8 +643,8 @@ class pts_test_run_manager
 		$tests_to_run_count = $this->get_test_count();
 		pts_client::$display->test_run_process_start($this);
 
-		$total_loop_count = (($t = pts_client::read_env('TOTAL_LOOP_COUNT')) && is_numeric($t) && $t > 0) ? $t : 1;
-		$total_loop_time = (($t = pts_client::read_env('TOTAL_LOOP_TIME')) && is_numeric($t) && $t > 9) ? ($t * 60) : -1;
+		$total_loop_count = (($t = pts_env::read('TOTAL_LOOP_COUNT')) && is_numeric($t) && $t > 0) ? $t : 1;
+		$total_loop_time = (($t = pts_env::read('TOTAL_LOOP_TIME')) && is_numeric($t) && $t > 9) ? ($t * 60) : -1;
 		$loop_end_time = $total_loop_time != -1 ? (time() + $total_loop_time) : false;
 		$this->test_run_count = ($tests_to_run_count * $total_loop_count);
 
@@ -665,7 +662,7 @@ class pts_test_run_manager
 					continue;
 				}
 
-				if(pts_config::read_bool_config('PhoronixTestSuite/Options/Testing/RemoveTestInstallOnCompletion', 'FALSE'))
+				if($this->remove_tests_on_completion)
 				{
 					// Remove the installed test if it's no longer needed in this run queue
 					$this_test_profile_identifier = $this->get_test_to_run($this->test_run_pos)->test_profile->get_identifier();
@@ -681,7 +678,7 @@ class pts_test_run_manager
 
 					if($still_in_queue == false)
 					{
-						pts_client::remove_installed_test($this->get_test_to_run($this->test_run_pos)->test_profile);
+						pts_tests::remove_installed_test($this->get_test_to_run($this->test_run_pos)->test_profile);
 					}
 				}
 
@@ -763,12 +760,13 @@ class pts_test_run_manager
 		{
 			return;
 		}
-		if($this->result_file->has_matching_test_and_run_identifier($test_run_request, $this->get_results_identifier()))
+		if($this->result_file->has_matching_test_and_run_identifier($test_run_request, $this->get_results_identifier()) && pts_env::read('TOTAL_LOOP_COUNT') == false && pts_env::read('TOTAL_LOOP_TIME') == false)
 		{
 			// There already is a match for this test in this particular result buffer
+			// except if using one of the loop controls where it may be repeated...
 			return true;
 		}
-		$skip_tests_with_args = ($e = pts_client::read_env('SKIP_TESTS_HAVING_ARGS')) ? pts_strings::comma_explode($e) : false;
+		$skip_tests_with_args = ($e = pts_env::read('SKIP_TESTS_HAVING_ARGS')) ? pts_strings::comma_explode($e) : false;
 		if($skip_tests_with_args)
 		{
 			foreach($skip_tests_with_args as $skip_test_if_arg_matches)
@@ -798,7 +796,7 @@ class pts_test_run_manager
 			// Just skip the current test and do not save the results, but continue testing
 			return 'SKIP';
 		}
-		else if(pts_client::read_env('LIMIT_ELAPSED_TEST_TIME') > 0 && (PTS_INIT_TIME + (pts_client::read_env('LIMIT_ELAPSED_TEST_TIME') * 60)) > time())
+		else if(pts_env::read('LIMIT_ELAPSED_TEST_TIME') > 0 && (PTS_INIT_TIME + (pts_env::read('LIMIT_ELAPSED_TEST_TIME') * 60)) > time())
 		{
 			// Allocated amount of time has expired
 			return false;
@@ -1215,10 +1213,6 @@ class pts_test_run_manager
 	{
 		return isset($this->openbenchmarking_results_data['url']) ? $this->openbenchmarking_results_data['url'] : false;
 	}
-	public function get_result_upload_data()
-	{
-		return $this->openbenchmarking_results_data;
-	}
 	public function set_batch_mode($custom_preset = false)
 	{
 		$this->batch_mode = array(
@@ -1255,7 +1249,7 @@ class pts_test_run_manager
 			{
 				return false;
 			}
-			if($test_profile->is_test_installed() == false)
+			if(!$test_profile->test_installation || $test_profile->test_installation->is_installed() == false)
 			{
 				// If the desired test version is not installed, see if a newer version in that release stream (minor version difference) is installed
 				if($check_for_new_on_fail)
@@ -1278,7 +1272,7 @@ class pts_test_run_manager
 	}
 	public function cleanup_tests_to_run(&$to_run_objects)
 	{
-		$skip_tests = ($e = pts_client::read_env('SKIP_TESTS')) ? pts_strings::comma_explode($e) : false;
+		$skip_tests = ($e = pts_env::read('SKIP_TESTS')) ? pts_strings::comma_explode($e) : false;
 		$tests_verified = array();
 		$tests_missing = array();
 
@@ -1495,7 +1489,7 @@ class pts_test_run_manager
 
 		if(($this->prompt_save_results || $this->force_save_results) && count($this->tests_to_run) > 0) // or check for DO_NOT_SAVE_RESULTS == false
 		{
-			if($this->force_save_results || pts_client::read_env('TEST_RESULTS_NAME'))
+			if($this->force_save_results || pts_env::read('TEST_RESULTS_NAME'))
 			{
 				$save_results = true;
 			}
@@ -1534,13 +1528,10 @@ class pts_test_run_manager
 						$this->run_description = 'N/A';
 					}
 
-					if(pts_client::read_env('TEST_RESULTS_DESCRIPTION'))
+					if(($td = pts_env::read('TEST_RESULTS_DESCRIPTION')) !== false)
 					{
-						if(strlen(pts_client::read_env('TEST_RESULTS_DESCRIPTION')) > 1)
-						{
-							$this->run_description = pts_client::read_env('TEST_RESULTS_DESCRIPTION');
-							echo 'Test Description: ' . $this->run_description . PHP_EOL;
-						}
+						$this->run_description = $td;
+						echo 'Test Description: ' . $this->run_description . PHP_EOL;
 					}
 					else if(!$this->auto_mode)
 					{
@@ -1646,12 +1637,6 @@ class pts_test_run_manager
 			{
 				$this->pre_run_message = $run_object->get_pre_run_message();
 				$this->post_run_message = $run_object->get_post_run_message();
-
-				if($run_object->get_run_mode() == 'PCQS')
-				{
-					$this->is_pcqs = true;
-				}
-
 				$tests_contained = $run_object->get_contained_test_result_objects();
 
 				if($this->prompt_to_test_subset() && !$this->auto_mode && !$this->batch_mode)
@@ -1707,18 +1692,38 @@ class pts_test_run_manager
 			}
 		}
 
-		// AlwaysUploadResultsToOpenBenchmarking AutoSortRunQueue
-		if(pts_config::read_bool_config('PhoronixTestSuite/Options/Testing/AutoSortRunQueue', 'TRUE') && $this->force_save_results == false)
+		// AutoSortRunQueue
+		if(pts_config::read_bool_config('PhoronixTestSuite/Options/Testing/AutoSortRunQueue', 'TRUE') && ($this->force_save_results == false || pts_env::read('TEST_EXECUTION_SORT')))
 		{
 			// Not that it matters much, but if $this->force_save_results is set that means likely running from a result file...
 			// so if running a result file, don't change the ordering of the existing results
 
 			// Sort the run order so that all tests that are similar are grouped together, etc
-			usort($this->tests_to_run, array('pts_test_run_manager', 'cmp_result_object_sort'));
-		}
-		if(pts_client::read_env('RUN_TESTS_IN_RANDOM_ORDER'))
-		{
-			shuffle($this->tests_to_run);
+			switch(strtolower(pts_env::read('TEST_EXECUTION_SORT')))
+			{
+				case 'none': // natural order
+					break;
+				case 'random':
+					shuffle($this->tests_to_run);
+					break;
+				case 'dependencies':
+					usort($this->tests_to_run, array('pts_test_run_manager', 'compare_result_objects_by_dependencies'));
+					break;
+				case 'test-estimated-time':
+					usort($this->tests_to_run, array('pts_test_run_manager', 'compare_result_objects_by_estimated_time'));
+					break;
+				case 'test-estimated-time-desc':
+					usort($this->tests_to_run, array('pts_test_run_manager', 'compare_result_objects_by_estimated_time'));
+					$this->tests_to_run = array_reverse($this->tests_to_run);
+					break;
+				case 'test':
+					usort($this->tests_to_run, array('pts_test_run_manager', 'compare_result_objects_by_test_identifier'));
+					break;
+				case 'default':
+				default:
+					usort($this->tests_to_run, array('pts_test_run_manager', 'compare_result_objects_by_subsystem_and_types'));
+					break;
+			}
 		}
 
 		$this->prompt_save_results = $run_contains_a_no_result_type == false || $unique_test_count > 1;
@@ -1785,7 +1790,7 @@ class pts_test_run_manager
 		{
 			$opts = pts_test_run_options::batch_user_options($test_profile);
 		}
-		else if($this->batch_mode && (pts_client::read_env('PRESET_OPTIONS') || pts_client::read_env('PRESET_OPTIONS_VALUES')))
+		else if($this->batch_mode && (pts_env::read('PRESET_OPTIONS') || pts_env::read('PRESET_OPTIONS_VALUES')))
 		{
 			$opts = pts_test_run_options::prompt_user_options($test_profile, null, true);
 		}
@@ -1840,7 +1845,7 @@ class pts_test_run_manager
 	{
 		return $this->test_subset;
 	}
-	public static function cmp_result_object_sort($a, $b)
+	public static function compare_result_objects_by_subsystem_and_types($a, $b)
 	{
 		$a_comp = $a->test_profile->get_test_hardware_type() . $a->test_profile->get_test_software_type() . $a->test_profile->get_internal_tags_raw() . $a->test_profile->get_result_scale_formatted() . $a->test_profile->get_identifier(true);
 		$b_comp = $b->test_profile->get_test_hardware_type() . $b->test_profile->get_test_software_type() . $b->test_profile->get_internal_tags_raw() . $b->test_profile->get_result_scale_formatted() . $b->test_profile->get_identifier(true);
@@ -1860,6 +1865,23 @@ class pts_test_run_manager
 
 		return strcmp($a_comp, $b_comp);
 	}
+	public static function compare_result_objects_by_test_identifier($a, $b)
+	{
+		return strcmp($a->test_profile->get_identifier(), $b->test_profile->get_identifier());
+	}
+	public static function compare_result_objects_by_estimated_time($a, $b)
+	{
+		return $a->get_estimated_run_time() < $b->get_estimated_run_time() ? -1 : 1;
+	}
+	public static function compare_result_objects_by_dependencies($a, $b)
+	{
+		$a_exdeps = $a->test_profile->get_external_dependencies();
+		$b_exdeps = $a->test_profile->get_external_dependencies();
+		sort($a_exdeps);
+		sort($b_exdeps);
+
+		return strcmp(implode(' ', $a_exdeps), implode(' ', $b_exdeps));
+	}
 	public static function test_result_system_compatibility_check(&$test_result, $report_errors = false)
 	{
 		$error = null;
@@ -1867,7 +1889,7 @@ class pts_test_run_manager
 		{
 			if($report_errors)
 			{
-				pts_client::$display->test_run_error('[' . $test_result->test_profile->get_identifier() . ' ' . $test_result->get_arguments_description() . '] ' . $error);
+				self::test_pre_run_error($test_result->test_profile, '[' . $test_result->test_profile->get_identifier() . ' ' . $test_result->get_arguments_description() . '] ' . $error);
 			}
 			return false;
 		}
@@ -1878,61 +1900,67 @@ class pts_test_run_manager
 	{
 		$valid_test_profile = true;
 		$test_type = $test_profile->get_test_hardware_type();
-		$skip_tests = pts_client::read_env('SKIP_TESTS') ? pts_strings::comma_explode(pts_client::read_env('SKIP_TESTS')) : false;
-		$skip_test_subsystems = pts_client::read_env('SKIP_TESTING_SUBSYSTEMS') ? pts_strings::comma_explode(strtolower(pts_client::read_env('SKIP_TESTING_SUBSYSTEMS'))) : false;
+		$skip_tests = pts_env::read('SKIP_TESTS') ? pts_strings::comma_explode(pts_env::read('SKIP_TESTS')) : false;
+		$skip_test_subsystems = pts_env::read('SKIP_TESTING_SUBSYSTEMS') ? pts_strings::comma_explode(strtolower(pts_env::read('SKIP_TESTING_SUBSYSTEMS'))) : false;
 		$display_driver = phodevi::read_property('system', 'display-driver');
 		$gpu = phodevi::read_name('gpu');
+		$test_error = null;
 
-		if($test_profile->is_supported($report_errors) == false)
+		if($test_profile->is_supported(false, $test_error) == false)
 		{
 			$valid_test_profile = false;
 		}
 		else if($test_profile->is_display_required() && !phodevi::is_display_server_active())
 		{
-			$report_errors && pts_client::$display->test_run_error('No display server was found, skipping ' . $test_profile);
+			$test_error = 'No display server was found, skipping ' . $test_profile;
 			$valid_test_profile = false;
 		}
 		else if($test_profile->is_network_required() && !pts_network::network_support_available())
 		{
-			$report_errors && pts_client::$display->test_run_error('No network connection was found or is disabled, skipping ' . $test_profile);
+			$test_error = 'No network connection was found or is disabled, skipping ' . $test_profile;
 			$valid_test_profile = false;
 		}
 		else if($test_profile->is_internet_required() && !pts_network::internet_support_available())
 		{
-			$report_errors && pts_client::$display->test_run_error('No Internet connection was found or is disabled, skipping ' . $test_profile);
+			$test_error = 'No Internet connection was found or is disabled, skipping ' . $test_profile;
 			$valid_test_profile = false;
 		}
 		else if($test_type == 'Graphics' && in_array($display_driver, array('vesa', 'nv', 'cirrus')) && stripos($gpu, 'LLVM') === false)
 		{
 			// These display drivers end up being in known configurations without 3D hardware support so unless an LLVM-based string is reported as the GPU, don't advertise 3D tests
-			$report_errors && pts_client::$display->test_run_error('3D acceleration support not available, skipping ' . $test_profile);
+			$test_error = '3D acceleration support not available, skipping ' . $test_profile;
 			$valid_test_profile = false;
 		}
 		else if($test_type == 'Disk' && stripos(phodevi::read_property('system', 'filesystem'), 'SquashFS') !== false)
 		{
-			$report_errors && pts_client::$display->test_run_error('Running on a RAM-based live file-system, skipping ' . $test_profile);
+			$test_error = 'Running on a RAM-based live file-system, skipping ' . $test_profile;
 			$valid_test_profile = false;
 		}
-		else if(pts_client::read_env('NO_' . strtoupper($test_type) . '_TESTS') ||($skip_tests && (in_array($test_profile, $skip_tests) || in_array($test_type, $skip_tests) || in_array($test_profile->get_identifier(false), $skip_tests) || in_array($test_profile->get_identifier_base_name(), $skip_tests))))
+		else if(($test_type != null && getenv('NO_' . strtoupper($test_type) . '_TESTS')) ||($skip_tests && (in_array($test_profile, $skip_tests) || in_array($test_type, $skip_tests) || in_array($test_profile->get_identifier(false), $skip_tests) || in_array($test_profile->get_identifier_base_name(), $skip_tests))))
 		{
-			$report_errors && pts_client::$display->test_run_error('Due to a pre-set environment variable, skipping ' . $test_profile);
+			$test_error = 'Due to a pre-set environment variable, skipping ' . $test_profile;
 			$valid_test_profile = false;
 		}
 		else if($skip_test_subsystems && in_array(strtolower($test_profile->get_test_hardware_type()), $skip_test_subsystems))
 		{
-			$report_errors && pts_client::$display->test_run_error('Due to a pre-set environment variable, skipping ' . $test_profile);
+			$test_error = 'Due to a pre-set environment variable, skipping ' . $test_profile;
 			$valid_test_profile = false;
 		}
 		else if($test_profile->is_root_required() && $is_batch_mode && phodevi::is_root() == false)
 		{
-			$report_errors && pts_client::$display->test_run_error('Running in batch mode as a user but this test requires root access, skipping ' . $test_profile);
+			$test_error = 'Running in batch mode as a user but this test requires root access, skipping ' . $test_profile;
 			$valid_test_profile = false;
 		}
 
-		if($valid_test_profile == false && pts_client::read_env('SKIP_ALL_TEST_SUPPORT_CHECKS'))
+		if($valid_test_profile == false && getenv('SKIP_ALL_TEST_SUPPORT_CHECKS'))
 		{
-			$report_errors && pts_client::$display->test_run_error('SKIP_ALL_TEST_SUPPORT_CHECKS is set for ' . $test_profile);
+			$test_error = 'SKIP_ALL_TEST_SUPPORT_CHECKS is set for ' . $test_profile;
 			$valid_test_profile = true;
+		}
+
+		if($report_errors && !empty($test_error))
+		{
+			self::test_pre_run_error($test_profile, $test_error);
 		}
 
 		return $valid_test_profile;
@@ -1951,7 +1979,7 @@ class pts_test_run_manager
 			}
 			else if($test_profile->get_test_executable_dir() == null)
 			{
-				pts_client::$display->test_run_error('The test executable for ' . pts_client::cli_just_bold($test_profile) . ' could not be located. Looking for ' . pts_client::cli_just_bold($test_profile->get_test_executable()) . ' in ' . pts_client::cli_just_italic($test_profile->get_install_dir()));
+				self::test_pre_run_error($test_profile, 'The test executable for ' . pts_client::cli_just_bold($test_profile) . ' could not be located. Looking for ' . pts_client::cli_just_bold($test_profile->get_test_executable()) . ' in ' . pts_client::cli_just_italic($test_profile->get_install_dir()));
 				$valid_test_profile = false;
 			}
 
@@ -1964,6 +1992,12 @@ class pts_test_run_manager
 		}
 
 		return $test_checks[$test_profile->get_identifier()];
+	}
+	protected static function test_pre_run_error(&$test_profile, $error_msg)
+	{
+		pts_client::$display->test_run_error($error_msg);
+		$error_obj = array($test_profile, $error_msg);
+		pts_module_manager::module_process('__event_pre_run_error', $error_obj);
 	}
 	public function standard_run($to_run)
 	{

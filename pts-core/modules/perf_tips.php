@@ -61,7 +61,7 @@ class perf_tips extends pts_module_interface
 	{
 		return 'This module alerts the user if the system configuration may not be the right one for achieving the best performance with the target benchmark(s). This initial version of the module actually cares only about the BFQ I/O scheduler: it gives a warning if BFQ is being used with an incorrect configuration in a disk benchmark, and suggests the right configuration to use. For the moment it only works for existing, throughput-based tests. It will need to be extended for responsiveness and soft real-time-latency tests.';
 	}
-	public static function module_environmental_variables()
+	public static function module_environment_variables()
 	{
 		return array('SUPPRESS_PERF_TIPS');
 	}
@@ -120,9 +120,10 @@ class perf_tips extends pts_module_interface
 			// BELOW ARE CHECKS TO MAKE IF WANTING TO SHOW FOR 'Processor' OR 'System' TESTS
 			$cpu_scaling_governor = phodevi::read_property('cpu', 'scaling-governor');
 
-			if(phodevi::is_linux() && stripos($cpu_scaling_governor, 'performance') === false)
+			// Linux: Check if scaling governor is available and if it is set to performance
+			if(phodevi::is_linux() && $cpu_scaling_governor && stripos($cpu_scaling_governor, 'performance') === false)
 			{
-				$perf_tips[] = new pts_perf_tip_msg('The powersave CPU scaling governor is currently in use. It\'s possible to obtain greater performance if using the performance governor.', 'echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor', 'https://openbenchmarking.org/result/1706268-TR-CPUGOVERN32');
+				$perf_tips[] = new pts_perf_tip_msg('The CPU scaling governor is currently not set to performance. It\'s possible to obtain greater performance if using the performance governor.', 'echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor', 'https://openbenchmarking.org/result/1706268-TR-CPUGOVERN32');
 			}
 
 			if(is_file('/sys/devices/system/cpu/cpufreq/boost'))

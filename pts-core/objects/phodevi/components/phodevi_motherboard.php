@@ -55,7 +55,7 @@ class phodevi_motherboard extends phodevi_device_interface
 		}
 		else if(phodevi::is_windows())
 		{
-			$confirm = shell_exec('powershell "Confirm-SecureBootUEFI"');
+			$confirm = shell_exec('powershell -NoProfile "Confirm-SecureBootUEFI"');
 			if(strpos($confirm, 'True') !== false)
 			{
 				$status = 'Enabled';
@@ -453,7 +453,7 @@ class phodevi_motherboard extends phodevi_device_interface
 			$bios_version = null;
 		}
 
-		return trim(str_replace(array('(', ')'), '', $bios_version));
+		return empty($bios_version) ? '' : trim(str_replace(array('(', ')'), '', $bios_version));
 	}
 	public static function motherboard_string()
 	{
@@ -480,7 +480,7 @@ class phodevi_motherboard extends phodevi_device_interface
 			$product = phodevi_bsd_parser::read_kenv('smbios.system.product');
 			$version = phodevi_bsd_parser::read_kenv('smbios.system.version'); // for at least Lenovo ThinkPads this is where it displays ThinkPad model
 
-			if($vendor != null && ($product != null || $version != null) && pts_strings::has_alpha($vendor) && strpos($product, 'System') === false)
+			if($vendor != null && ($product != null || $version != null) && strpos($product, 'System') === false)
 			{
 				$info = $vendor . ' ' . $product . ' ' . $version;
 			}
@@ -511,6 +511,30 @@ class phodevi_motherboard extends phodevi_device_interface
 				if($version != false && strpos($info, $version) === false && pts_strings::string_only_contains($version, pts_strings::CHAR_NUMERIC | pts_strings::CHAR_DECIMAL))
 				{
 					$info .= (substr($version, 0, 1) == 'v' ? ' ' : ' v') . $version;
+				}
+
+				if((phodevi::is_root() || is_readable('/dev/mem')) && pts_client::executable_in_path('dmidecode'))
+				{
+					// For some vendors, it's better to read system-product-name
+					// Unfortunately other vendors report garbage here, also demidecode only works as root on Linux
+					foreach(array('Dell', 'Apple') as $vend)
+					{
+						if(stripos($info, $vend . ' ') !== false)
+						{
+							$dmi_output = shell_exec('dmidecode -s system-product-name 2>&1');
+							if($dmi_output != null && stripos($dmi_output, ' ') !== false && stripos($dmi_output, 'invalid') === false && stripos($dmi_output, 'System Product') === false && stripos($dmi_output, 'not ') === false)
+							{
+								$old_info = trim(str_ireplace(array($vend . ' ', 'Inc.'), '', $info));
+								$info = trim($dmi_output) . (!empty($old_info) && strpos($dmi_output, $old_info) === false ? ' [' . $old_info . ']' : '');
+							}
+
+							if($info != null && stripos($info, $vend) === false)
+							{
+								$info = $vend . ' ' . $info;
+								break;
+							}
+						}
+					}
 				}
 			}
 
@@ -587,6 +611,29 @@ class phodevi_motherboard extends phodevi_device_interface
 			if(empty($info))
 			{
 				$info = phodevi_windows_parser::get_wmi_object('Win32_MotherboardDevice', 'Name');
+			}
+			foreach(array('Dell', 'Apple') as $vend)
+			{
+				if(stripos($info, $vend . ' ') !== false)
+				{
+					$wmi = shell_exec('wmic csproduct get name');
+					if(($x = strpos($wmi, 'Name')) !== false)
+					{
+						$wmi = trim(substr($wmi, $x + 4));
+
+						if(!empty($wmi) && stripos($wmi, 'System Product') === false)
+						{
+							if(stripos($wmi, $vend . ' ') === false)
+							{
+								$wmi = $vend . ' ' . $wmi;
+							}
+
+							$old_info = trim(str_ireplace(array($vend . ' ', 'Inc.'), '', $info));
+							$info = $wmi . (!empty($old_info) && strpos($wmi, $old_info) === false ? ' [' . $old_info . ']' : '');
+							break;
+						}
+					}
+				}
 			}
 		}
 

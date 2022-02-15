@@ -3,8 +3,8 @@
 /*
 	Phoronix Test Suite
 	URLs: http://www.phoronix.com, http://www.phoronix-test-suite.com/
-	Copyright (C) 2008 - 2018, Phoronix Media
-	Copyright (C) 2008 - 2018, Michael Larabel
+	Copyright (C) 2008 - 2022, Phoronix Media
+	Copyright (C) 2008 - 2022, Michael Larabel
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 	You should have received a copy of the GNU General Public License
 	along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
-
 
 class phoromatic_schedules implements pts_webui_interface
 {
@@ -55,12 +54,12 @@ class phoromatic_schedules implements pts_webui_interface
 			}
 			else
 			{
-
 				if(!PHOROMATIC_USER_IS_VIEWER)
 				{
 
-					if(isset($_POST['add_to_schedule_select_test']))
+					if(isset($_POST['add_to_schedule_select_test']) && verify_submission_token())
 					{
+						phoromatic_quit_if_invalid_input_found(array('add_to_schedule_select_test'));
 						$name = $_POST['add_to_schedule_select_test'];
 						$args = array();
 						$args_name = array();
@@ -69,6 +68,7 @@ class phoromatic_schedules implements pts_webui_interface
 						{
 							if(substr($i, 0, 12) == 'test_option_' && substr($i, -9) != '_selected')
 							{
+								phoromatic_quit_if_invalid_input_found(array($i, $i . '_selected'));
 								array_push($args, $v);
 								array_push($args_name, $_POST[$i . '_selected']);
 							}
@@ -89,6 +89,25 @@ class phoromatic_schedules implements pts_webui_interface
 							phoromatic_add_activity_stream_event('tests_for_schedule', $PATH[0], 'added');
 						}
 					}
+					else if(isset($_POST['suite_add']) && verify_submission_token())
+					{
+						$test_suite = phoromatic_server::find_suite_file($_SESSION['AccountID'], $_POST['suite_add']);
+						if(is_file($test_suite))
+						{
+							$test_suite = new pts_test_suite($test_suite);
+							foreach($test_suite->get_contained_test_result_objects() as $tro)
+							{
+								$stmt = phoromatic_server::$db->prepare('INSERT INTO phoromatic_schedules_tests (AccountID, ScheduleID, TestProfile, TestArguments, TestDescription) VALUES (:account_id, :schedule_id, :test_profile, :test_arguments, :test_description)');
+								$stmt->bindValue(':account_id', $_SESSION['AccountID']);
+								$stmt->bindValue(':schedule_id', $PATH[0]);
+								$stmt->bindValue(':test_profile', $tro->test_profile->get_identifier());
+								$stmt->bindValue(':test_arguments', $tro->get_arguments());
+								$stmt->bindValue(':test_description', $tro->get_arguments_description());
+								$result = $stmt->execute();
+								phoromatic_add_activity_stream_event('tests_for_schedule', $PATH[0], 'added');
+							}
+						}
+					}
 					else if(isset($PATH[1]) && $PATH[1] == 'remove' && !empty($PATH[2]))
 					{
 						// REMOVE TEST
@@ -104,7 +123,7 @@ class phoromatic_schedules implements pts_webui_interface
 					else if(isset($PATH[1]) && $PATH[1] == 'delete-trigger' && !empty($PATH[2]))
 					{
 						// REMOVE TRIGGER
-						$trigger = base64_decode($PATH[2]);
+						$trigger = pts_strings::sanitize(base64_decode($PATH[2]));
 						$stmt = phoromatic_server::$db->prepare('DELETE FROM phoromatic_schedules_triggers WHERE AccountID = :account_id AND Trigger = :trigger AND ScheduleID = :schedule_id');
 						$stmt->bindValue(':account_id', $_SESSION['AccountID']);
 						$stmt->bindValue(':schedule_id', $PATH[0]);
@@ -113,7 +132,7 @@ class phoromatic_schedules implements pts_webui_interface
 						if($result)
 							$main .= '<h2 style="color: red;">Trigger Removed: ' . $trigger . '</h2>';
 					}
-					else if(isset($PATH[1]) && in_array($PATH[1], array('activate', 'deactivate')))
+					else if(isset($PATH[1]) && in_array($PATH[1], array('activate', 'deactivate')) && verify_submission_token())
 					{
 						switch($PATH[1])
 						{
@@ -135,7 +154,7 @@ class phoromatic_schedules implements pts_webui_interface
 						$row['State'] = $new_state;
 						phoromatic_add_activity_stream_event('schedule', $PATH[0], $PATH[1]);
 					}
-					else if(isset($_POST['do_manual_test_run']))
+					else if(isset($_POST['do_manual_test_run']) && verify_submission_token())
 					{
 						$stmt = phoromatic_server::$db->prepare('INSERT INTO phoromatic_schedules_triggers (AccountID, ScheduleID, Trigger, TriggeredOn) VALUES (:account_id, :schedule_id, :trigger, :triggered_on)');
 						$stmt->bindValue(':account_id',	$_SESSION['AccountID']);
@@ -145,7 +164,7 @@ class phoromatic_schedules implements pts_webui_interface
 						$stmt->execute();
 						$main .= '<h2 style="color: red;">Manual Test Run Triggered</h2>';
 					}
-					else if(isset($_POST['skip_current_ticket']))
+					else if(isset($_POST['skip_current_ticket']) && verify_submission_token())
 					{
 						$stmt = phoromatic_server::$db->prepare('INSERT INTO phoromatic_schedules_trigger_skips (AccountID, ScheduleID, Trigger) VALUES (:account_id, :schedule_id, :trigger)');
 						$stmt->bindValue(':account_id',	$_SESSION['AccountID']);
@@ -155,7 +174,6 @@ class phoromatic_schedules implements pts_webui_interface
 						$main .= '<h2 style="color: red;">Current Trigger To Be Ignored</h2>';
 					}
 				}
-
 
 				$main .= '<h1>' . $row['Title'] . '</h1>';
 				$main .= '<h3>' . $row['Description'] . '</h3>';
@@ -183,11 +201,11 @@ class phoromatic_schedules implements pts_webui_interface
 
 					if($row['State'] == 1)
 					{
-						$main .= '<a href="?schedules/' . $PATH[0] . '/deactivate">Deactivate Schedule</a>';
+						$main .= '<a href="?schedules/' . $PATH[0] . '/deactivate' . append_token_to_url()  . '">Deactivate Schedule</a>';
 					}
 					else
 					{
-						$main .= '<a href="?schedules/' . $PATH[0] . '/activate">Activate Schedule</a>';
+						$main .= '<a href="?schedules/' . $PATH[0] . '/activate' . append_token_to_url()  . '">Activate Schedule</a>';
 					}
 
 					$main .= '</p>';
@@ -229,15 +247,15 @@ class phoromatic_schedules implements pts_webui_interface
 				}
 				if(!PHOROMATIC_USER_IS_VIEWER)
 				{
-				$trigger_url = 'http://' . phoromatic_web_socket_server_ip() . '/event.php?type=trigger&user=' . $_SESSION['UserName'] . '&public_key=' . $row['PublicKey'] . '&trigger=XXX';
-				$main .= '<p>This test schedule can be manually triggered to run at any time by calling <strong>' . $trigger_url . '</strong> where <em>XXX</em> is the trigger value to be used (if relevant, such as a time-stamp, Git/SVN commit number or hash, etc). There\'s also the option of sub-targeting system(s) part of this schedule. One option is appending <em>&sub_target_this_ip</em> if this URL is being called from one of the client test systems to only sub-target the triggered testing on that client, among other options.</p>';
-				$main .= '<p>If you wish to run this test schedule now, click the following button and the schedule will be run on all intended systems at their next earliest possible convenience.</p>';
-				$main .= '<p><form action="?schedules/' . $PATH[0] . '" name="manual_run" method="post">';
-				$main .= '<input type="hidden" name="do_manual_test_run" value="1" /><input type="submit" value="Run Test Schedule Now" onclick="return confirm(\'Run this test schedule now?\');" />';
-				$main .= '</form></p>';
-				$main .= '<p><form action="?schedules/' . $PATH[0] . '" name="skip_run" method="post">';
-				$main .= '<input type="hidden" name="skip_current_ticket" value="1" /><input type="submit" value="Skip Current Test Ticket" onclick="return confirm(\'Skip any currently active test ticket on all systems?\');" />';
-				$main .= '</form></p>';
+					$trigger_url = 'http://' . phoromatic_web_socket_server_ip() . '/event.php?type=trigger&user=' . $_SESSION['UserName'] . '&public_key=' . $row['PublicKey'] . '&trigger=XXX';
+					$main .= '<p>This test schedule can be manually triggered to run at any time by calling <strong>' . $trigger_url . '</strong> where <em>XXX</em> is the trigger value to be used (if relevant, such as a time-stamp, Git/SVN commit number or hash, etc). There\'s also the option of sub-targeting system(s) part of this schedule. One option is appending <em>&sub_target_this_ip</em> if this URL is being called from one of the client test systems to only sub-target the triggered testing on that client, among other options.</p>';
+					$main .= '<p>If you wish to run this test schedule now, click the following button and the schedule will be run on all intended systems at their next earliest possible convenience.</p>';
+					$main .= '<p><form action="?schedules/' . $PATH[0] . '" name="manual_run" method="post">';
+					$main .= write_token_in_form() . '<input type="hidden" name="do_manual_test_run" value="1" /><input type="submit" value="Run Test Schedule Now" onclick="return confirm(\'Run this test schedule now?\');" />';
+					$main .= '</form></p>';
+					$main .= '<p><form action="?schedules/' . $PATH[0] . '" name="skip_run" method="post">';
+					$main .= write_token_in_form() . '<input type="hidden" name="skip_current_ticket" value="1" /><input type="submit" value="Skip Current Test Ticket" onclick="return confirm(\'Skip any currently active test ticket on all systems?\');" />';
+					$main .= '</form></p>';
 				}
 
 				$main .= '<hr />';
@@ -252,6 +270,17 @@ class phoromatic_schedules implements pts_webui_interface
 						$main .= '<h2>' . $v . ' Context Script</h2>';
 						$main .= '<blockquote>' . str_replace(PHP_EOL, '<br />', htmlentities(file_get_contents(phoromatic_server::phoromatic_account_path($_SESSION['AccountID']) . 'context_' . $row[$context]))) . '</blockquote>';
 					}
+				}
+
+				if(!empty($row['EnvironmentVariables']))
+				{
+					$main .= '<hr /><h1>Environment Variables</h1><ol>';
+
+					foreach(explode(';', $row['EnvironmentVariables']) as $env)
+					{
+						$main .= '<li><strong>' . $env . '</strong></li>';
+					}
+					$main .= '</ol>';
 				}
 
 				if($scripts > 0)
@@ -300,7 +329,7 @@ class phoromatic_schedules implements pts_webui_interface
 				{
 					$main .= '<hr /><h2>Add A Test</h2>';
 					$main .= '<form action="?schedules/' . $PATH[0] . '" name="add_test" id="add_test" method="post">';
-					$main .= '<select name="add_to_schedule_select_test" id="add_to_schedule_select_test" onchange="phoromatic_schedule_test_details(\'\');">';
+					$main .= write_token_in_form() . '<select name="add_to_schedule_select_test" id="add_to_schedule_select_test" onchange="phoromatic_schedule_test_details(\'\');">';
 					$dc = pts_client::download_cache_path();
 					$dc_exists = is_file($dc . 'pts-download-cache.json');
 					if($dc_exists)
@@ -308,7 +337,7 @@ class phoromatic_schedules implements pts_webui_interface
 						$cache_json = file_get_contents($dc . 'pts-download-cache.json');
 						$cache_json = json_decode($cache_json, true);
 					}
-					foreach(array_merge(pts_tests::local_tests(), pts_openbenchmarking::available_tests(false, true)) as $test)
+					foreach(array_merge(pts_tests::local_tests(), pts_openbenchmarking::available_tests(false, isset($_COOKIE['list_show_all_test_versions']) && $_COOKIE['list_show_all_test_versions'])) as $test)
 					{
 						if(phoromatic_server::read_setting('show_local_tests_only'))
 						{
@@ -332,7 +361,28 @@ class phoromatic_schedules implements pts_webui_interface
 						$main .= '<option value="' . $test . '">' . $test . '</option>';
 					}
 					$main .= '</select>';
+					$main .= pts_web_embed::cookie_checkbox_option_helper('list_show_all_test_versions', 'Show all available test profile versions.');
 					$main .= '<p><div id="test_details"></div></p>';
+					$main .= '</form>';
+
+					$local_suites = array();
+					foreach(pts_file_io::glob(phoromatic_server::phoromatic_account_suite_path($_SESSION['AccountID']) . '*/suite-definition.xml') as $xml_path)
+					{
+						$id = basename(dirname($xml_path));
+						$test_suite = new pts_test_suite($xml_path);
+						$local_suites[$test_suite->get_title() . ' - ' . $id] = $id;
+					}
+					$official_suites = pts_test_suites::suites_on_disk(false, true);
+
+					$main .= '<hr /><h2>Add A Suite:</h2>';
+					$main .= '<form action="?schedules/' . $PATH[0] . '" name="add_suite" id="add_suite" method="post">';
+					$main .= write_token_in_form() . '<p><select name="suite_to_run" id="suite_to_run_identifier" onchange="phoromatic_show_basic_suite_details(\'\');">';
+					foreach(array_merge($local_suites, $official_suites) as $title => $id)
+					{
+						$main .= '<option value="' . $id . '">' . $title . '</option>';
+					}
+					$main .= '</select></p>';
+					$main .= '<p><div id="suite_details"></div></p>';
 					$main .= '</form>';
 				}
 
@@ -367,7 +417,7 @@ class phoromatic_schedules implements pts_webui_interface
 
 					do
 					{
-						$main .= '<a onclick=""><li>' . $test_result_row['Trigger'] . '<br /><table><tr><td>' . phoromatic_user_friendly_timedate($test_result_row['TriggeredOn']) . '</td><td><a href="?schedules/' . $PATH[0] . '/delete-trigger/' . base64_encode($test_result_row['Trigger']) . '">Remove Trigger</a></td></tr></table></li></a>';
+						$main .= '<a onclick=""><li>' . $test_result_row['Trigger'] . '<br /><table><tr><td>' . phoromatic_server::user_friendly_timedate($test_result_row['TriggeredOn']) . '</td><td><a href="?schedules/' . $PATH[0] . '/delete-trigger/' . base64_encode($test_result_row['Trigger']) . '">Remove Trigger</a></td></tr></table></li></a>';
 
 					}
 					while($test_result_row = $test_result_result->fetchArray());
@@ -375,13 +425,12 @@ class phoromatic_schedules implements pts_webui_interface
 					$main .= '</div>';
 				}
 
-
-
 				$stmt = phoromatic_server::$db->prepare('SELECT Title, SystemID, ScheduleID, PPRID, UploadTime FROM phoromatic_results WHERE AccountID = :account_id AND ScheduleID = :schedule_id ORDER BY UploadTime DESC');
 				$stmt->bindValue(':account_id', $_SESSION['AccountID']);
 				$stmt->bindValue(':schedule_id', $PATH[0]);
 				$test_result_result = $stmt->execute();
 				$test_result_row = $test_result_result->fetchArray();
+				$oldest_upload_time = 0;
 
 				if($test_result_row)
 				{
@@ -395,7 +444,7 @@ class phoromatic_schedules implements pts_webui_interface
 						{
 							continue;
 						}
-						$main .= '<a href="?result/' . $test_result_row['PPRID'] . '"><li>' . $test_result_row['Title'] . '<br /><table><tr><td>' . phoromatic_system_id_to_name($test_result_row['SystemID']) . '</td><td>' . phoromatic_user_friendly_timedate($test_result_row['UploadTime']) .  '</td></tr></table></li></a>';
+						$main .= '<a href="?result/' . $test_result_row['PPRID'] . '"><li>' . $test_result_row['Title'] . '<br /><table><tr><td>' . phoromatic_server::system_id_to_name($test_result_row['SystemID']) . '</td><td>' . phoromatic_server::user_friendly_timedate($test_result_row['UploadTime']) .  '</td></tr></table></li></a>';
 						$results++;
 
 					}
@@ -409,7 +458,7 @@ class phoromatic_schedules implements pts_webui_interface
 				{
 					$main .= '<p>Jump to the latest results from the past: ';
 					$main .= '<select name="view_results_from_past" id="view_results_from_past" onchange="phoromatic_jump_to_results_from(\'' . $PATH[0] . '\', \'view_results_from_past\');">';
-					$oldest_upload_time = strtotime($oldest_upload_time);
+					$oldest_upload_time = !empty($oldest_upload_time) ? strtotime($oldest_upload_time) : 0;
 					$opts = array(
 						'Week' => 7,
 						'Three Weeks' => 21,
@@ -438,116 +487,110 @@ class phoromatic_schedules implements pts_webui_interface
 
 
 		$main = '<h1>Test Schedules</h1>
-			<p>Test schedules are used for tests that are intended to be run on a recurring basis -- either daily or other defined time period -- or whenever a trigger/event occurs, like a new Git commit to a software repository being tracked. Test schedules can be run on any given system(s)/group(s) and can be later edited.</p>';
+		<p>Test schedules are used for tests that are intended to be run on a recurring basis -- either daily or other defined time period -- or whenever a trigger/event occurs, like a new Git commit to a software repository being tracked. Test schedules can be run on any given system(s)/group(s) and can be later edited.</p>';
 
-			if(!PHOROMATIC_USER_IS_VIEWER)
+		if(!PHOROMATIC_USER_IS_VIEWER)
+		{
+			$main .= '
+			<hr />
+			<h2>Create A Schedule</h2>
+			<p><a href="?sched">Create a schedule</a> followed by adding tests/suites to run for that schedule on the selected systems.</p>';
+		}
+
+		$main .= '<hr /><h2>Current Schedules</h2>';
+		$main .= '<div class="pts_phoromatic_info_box_area">
+			<ul>
+			<li><h1>Active Test Schedules</h1></li>';
+
+		$stmt = phoromatic_server::$db->prepare('SELECT Title, ScheduleID, Description, RunTargetSystems, RunTargetGroups, RunAt, ActiveOn FROM phoromatic_schedules WHERE AccountID = :account_id AND State >= 1 ORDER BY Title ASC');
+		$stmt->bindValue(':account_id', $_SESSION['AccountID']);
+		$result = $stmt->execute();
+		$row = $result->fetchArray();
+
+		if($row == false)
+		{
+			$main .= '<li class="light" style="text-align: center;">No Schedules Found</li>';
+		}
+		else
+		{
+			do
 			{
-				$main .= '
-				<hr />
-				<h2>Create A Schedule</h2>
-				<p><a href="?sched">Create a schedule</a> followed by adding tests/suites to run for that schedule on the selected systems.</p>';
+				$stmt_tests = phoromatic_server::$db->prepare('SELECT COUNT(*) AS TestCount FROM phoromatic_schedules_tests WHERE AccountID = :account_id AND ScheduleID = :schedule_id ORDER BY TestProfile ASC');
+				$stmt_tests->bindValue(':account_id', $_SESSION['AccountID']);
+				$stmt_tests->bindValue(':schedule_id', $row['ScheduleID']);
+				$result_tests = $stmt_tests->execute();
+				$row_tests = $result_tests->fetchArray();
+				$test_count = !empty($row_tests) ? $row_tests['TestCount'] : 0;
+
+				$group_count = empty($row['RunTargetGroups']) ? 0 : count(explode(',', $row['RunTargetGroups']));
+				$main .= '<a href="?schedules/' . $row['ScheduleID'] . '"><li>' . $row['Title'] . '<br /><table><tr><td>' . pts_strings::plural_handler(count(phoromatic_server::systems_associated_with_schedule($_SESSION['AccountID'], $row['ScheduleID'])), 'System') . '</td><td>' . pts_strings::plural_handler($group_count, 'Group') . '</td><td>' . pts_strings::plural_handler($test_count, 'Test') . '</td><td>' . pts_strings::plural_handler(phoromatic_results_for_schedule($row['ScheduleID']), 'Result') . ' Total</td><td>' . pts_strings::plural_handler(phoromatic_results_for_schedule($row['ScheduleID'], 'TODAY'), 'Result') . ' Today</td><td><strong>' . phoromatic_schedule_activeon_string($row['ActiveOn'], $row['RunAt']) . '</strong></td></tr></table></li></a>';
 			}
+			while($row = $result->fetchArray());
+		}
 
-			$main .= '<hr /><h2>Current Schedules</h2>';
+		$main .= '</ul>
+		</div>';
 
+		$main .= '<hr /><h2>Schedule Overview</h2>';
+		$week = array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
 
-			$main .= '<div class="pts_phoromatic_info_box_area">
-					<ul>
-						<li><h1>Active Test Schedules</h1></li>';
-
-					$stmt = phoromatic_server::$db->prepare('SELECT Title, ScheduleID, Description, RunTargetSystems, RunTargetGroups, RunAt, ActiveOn FROM phoromatic_schedules WHERE AccountID = :account_id AND State >= 1 ORDER BY Title ASC');
-					$stmt->bindValue(':account_id', $_SESSION['AccountID']);
-					$result = $stmt->execute();
-					$row = $result->fetchArray();
-
-					if($row == false)
-					{
-						$main .= '<li class="light" style="text-align: center;">No Schedules Found</li>';
-					}
-					else
-					{
-						do
-						{
-							$stmt_tests = phoromatic_server::$db->prepare('SELECT COUNT(*) AS TestCount FROM phoromatic_schedules_tests WHERE AccountID = :account_id AND ScheduleID = :schedule_id ORDER BY TestProfile ASC');
-							$stmt_tests->bindValue(':account_id', $_SESSION['AccountID']);
-							$stmt_tests->bindValue(':schedule_id', $row['ScheduleID']);
-							$result_tests = $stmt_tests->execute();
-							$row_tests = $result_tests->fetchArray();
-							$test_count = !empty($row_tests) ? $row_tests['TestCount'] : 0;
-
-							$group_count = empty($row['RunTargetGroups']) ? 0 : count(explode(',', $row['RunTargetGroups']));
-							$main .= '<a href="?schedules/' . $row['ScheduleID'] . '"><li>' . $row['Title'] . '<br /><table><tr><td>' . pts_strings::plural_handler(count(phoromatic_server::systems_associated_with_schedule($_SESSION['AccountID'], $row['ScheduleID'])), 'System') . '</td><td>' . pts_strings::plural_handler($group_count, 'Group') . '</td><td>' . pts_strings::plural_handler($test_count, 'Test') . '</td><td>' . pts_strings::plural_handler(phoromatic_results_for_schedule($row['ScheduleID']), 'Result') . ' Total</td><td>' . pts_strings::plural_handler(phoromatic_results_for_schedule($row['ScheduleID'], 'TODAY'), 'Result') . ' Today</td><td><strong>' . phoromatic_schedule_activeon_string($row['ActiveOn'], $row['RunAt']) . '</strong></td></tr></table></li></a>';
-						}
-						while($row = $result->fetchArray());
-					}
-
-
-			$main .= '</ul>
-			</div>';
-
-			$main .= '<hr /><h2>Schedule Overview</h2>';
-			$week = array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
-
-			foreach($week as $i => $day)
+		foreach($week as $i => $day)
+		{
+			$stmt = phoromatic_server::$db->prepare('SELECT Title, ScheduleID, RunAt, RunTargetGroups, RunTargetSystems FROM phoromatic_schedules WHERE AccountID = :account_id AND State >= 1 AND ActiveOn LIKE :active_on ORDER BY RunAt,ActiveOn,Title ASC');
+			$stmt->bindValue(':account_id', $_SESSION['AccountID']);
+			$stmt->bindValue(':active_on', '%' . $i . '%');
+			$result = $stmt->execute();
+			$has_matched = false;
+			while($row = $result->fetchArray())
 			{
-				$stmt = phoromatic_server::$db->prepare('SELECT Title, ScheduleID, RunAt, RunTargetGroups, RunTargetSystems FROM phoromatic_schedules WHERE AccountID = :account_id AND State >= 1 AND ActiveOn LIKE :active_on ORDER BY RunAt,ActiveOn,Title ASC');
-				$stmt->bindValue(':account_id', $_SESSION['AccountID']);
-				$stmt->bindValue(':active_on', '%' . $i . '%');
-				$result = $stmt->execute();
-				$has_matched = false;
-				while($row = $result->fetchArray())
+				if(!$has_matched)
 				{
-					if(!$has_matched)
-					{
-						$main .= '<h3>' . $day . '</h3>' . PHP_EOL . '<p>';
-						$has_matched = true;
-					}
-					$main .= '<em>' . $row['RunAt'] . '</em> <a href="?schedules/' . $row['ScheduleID'] . '">' . $row['Title'] . '</a>';
-					//$main .= $row['RunTargetSystems'] . ' ' . $row['RunTargetGroups'];
-					$main .= '<br />';
+					$main .= '<h3>' . $day . '</h3>' . PHP_EOL . '<p>';
+					$has_matched = true;
 				}
-
-				if($has_matched)
-					$main .= '</p>' . PHP_EOL;
-
+				$main .= '<em>' . $row['RunAt'] . '</em> <a href="?schedules/' . $row['ScheduleID'] . '">' . $row['Title'] . '</a>';
+				//$main .= $row['RunTargetSystems'] . ' ' . $row['RunTargetGroups'];
+				$main .= '<br />';
 			}
 
-			$main .= '<div class="pts_phoromatic_info_box_area">
-					<ul>
-						<li><h1>Deactivated Test Schedules</h1></li>';
+			if($has_matched)
+				$main .= '</p>' . PHP_EOL;
+		}
 
-					$stmt = phoromatic_server::$db->prepare('SELECT Title, ScheduleID, Description, RunTargetSystems, RunTargetGroups, RunAt, ActiveOn FROM phoromatic_schedules WHERE AccountID = :account_id AND State < 1 ORDER BY Title ASC');
-					$stmt->bindValue(':account_id', $_SESSION['AccountID']);
-					$result = $stmt->execute();
-					$row = $result->fetchArray();
+		$main .= '<div class="pts_phoromatic_info_box_area">
+				<ul>
+				<li><h1>Deactivated Test Schedules</h1></li>';
 
-					if($row == false)
-					{
-						$main .= '<li class="light" style="text-align: center;">No Schedules Found</li>';
-					}
-					else
-					{
-						do
-						{
-							$stmt_tests = phoromatic_server::$db->prepare('SELECT COUNT(*) AS TestCount FROM phoromatic_schedules_tests WHERE AccountID = :account_id AND ScheduleID = :schedule_id ORDER BY TestProfile ASC');
-							$stmt_tests->bindValue(':account_id', $_SESSION['AccountID']);
-							$stmt_tests->bindValue(':schedule_id', $row['ScheduleID']);
-							$result_tests = $stmt_tests->execute();
-							$row_tests = $result_tests->fetchArray();
-							$test_count = !empty($row_tests) ? $row_tests['TestCount'] : 0;
+		$stmt = phoromatic_server::$db->prepare('SELECT Title, ScheduleID, Description, RunTargetSystems, RunTargetGroups, RunAt, ActiveOn FROM phoromatic_schedules WHERE AccountID = :account_id AND State < 1 ORDER BY Title ASC');
+		$stmt->bindValue(':account_id', $_SESSION['AccountID']);
+		$result = $stmt->execute();
+		$row = $result->fetchArray();
 
-							$group_count = empty($row['RunTargetGroups']) ? 0 : count(explode(',', $row['RunTargetGroups']));
-							$main .= '<a href="?schedules/' . $row['ScheduleID'] . '"><li>' . $row['Title'] . '<br /><table><tr><td>' . pts_strings::plural_handler(count(phoromatic_server::systems_associated_with_schedule($_SESSION['AccountID'], $row['ScheduleID'])), 'System') . '</td><td>' . pts_strings::plural_handler($group_count, 'Group') . '</td><td>' . pts_strings::plural_handler($test_count, 'Test') . '</td><td>' . pts_strings::plural_handler(phoromatic_results_for_schedule($row['ScheduleID']), 'Result') . ' Total</td><td>' . pts_strings::plural_handler(phoromatic_results_for_schedule($row['ScheduleID'], 'TODAY'), 'Result') . ' Today</td><td><strong>' . phoromatic_schedule_activeon_string($row['ActiveOn'], $row['RunAt']) . '</strong></td></tr></table></li></a>';
-						}
-						while($row = $result->fetchArray());
-					}
+		if($row == false)
+		{
+			$main .= '<li class="light" style="text-align: center;">No Schedules Found</li>';
+		}
+		else
+		{
+			do
+			{
+				$stmt_tests = phoromatic_server::$db->prepare('SELECT COUNT(*) AS TestCount FROM phoromatic_schedules_tests WHERE AccountID = :account_id AND ScheduleID = :schedule_id ORDER BY TestProfile ASC');
+				$stmt_tests->bindValue(':account_id', $_SESSION['AccountID']);
+				$stmt_tests->bindValue(':schedule_id', $row['ScheduleID']);
+				$result_tests = $stmt_tests->execute();
+				$row_tests = $result_tests->fetchArray();
+				$test_count = !empty($row_tests) ? $row_tests['TestCount'] : 0;
+				$group_count = empty($row['RunTargetGroups']) ? 0 : count(explode(',', $row['RunTargetGroups']));
+				$main .= '<a href="?schedules/' . $row['ScheduleID'] . '"><li>' . $row['Title'] . '<br /><table><tr><td>' . pts_strings::plural_handler(count(phoromatic_server::systems_associated_with_schedule($_SESSION['AccountID'], $row['ScheduleID'])), 'System') . '</td><td>' . pts_strings::plural_handler($group_count, 'Group') . '</td><td>' . pts_strings::plural_handler($test_count, 'Test') . '</td><td>' . pts_strings::plural_handler(phoromatic_results_for_schedule($row['ScheduleID']), 'Result') . ' Total</td><td>' . pts_strings::plural_handler(phoromatic_results_for_schedule($row['ScheduleID'], 'TODAY'), 'Result') . ' Today</td><td><strong>' . phoromatic_schedule_activeon_string($row['ActiveOn'], $row['RunAt']) . '</strong></td></tr></table></li></a>';
+			}
+			while($row = $result->fetchArray());
+		}
 
+		$main .= '</ul>
+		</div>';
 
-			$main .= '</ul>
-			</div>';
-
-			echo '<div id="pts_phoromatic_main_area">' . $main . '</div>';
-			echo phoromatic_webui_footer();
+		echo '<div id="pts_phoromatic_main_area">' . $main . '</div>';
+		echo phoromatic_webui_footer();
 	}
 }
 

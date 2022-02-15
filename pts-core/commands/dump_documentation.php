@@ -3,8 +3,8 @@
 /*
 	Phoronix Test Suite
 	URLs: http://www.phoronix.com, http://www.phoronix-test-suite.com/
-	Copyright (C) 2010 - 2021, Phoronix Media
-	Copyright (C) 2010 - 2021, Michael Larabel
+	Copyright (C) 2010 - 2022, Phoronix Media
+	Copyright (C) 2010 - 2022, Michael Larabel
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -22,17 +22,19 @@
 
 class dump_documentation implements pts_option_interface
 {
+	const doc_section = 'Asset Creation';
+	const doc_description = 'This option is used for re-generating the Phoronix Test Suite documentation.';
 	public static function run($r)
 	{
-		$pdf = new pts_pdf_template(pts_core::program_title(false), 'Test Client Documentation');
-		$html_doc = new pts_html_template(pts_core::program_title(false), 'Test Client Documentation');
+		$pdf = new pts_pdf_template(pts_core::program_title(), 'Test Client Documentation');
+		$html_doc = new pts_html_template(pts_core::program_title(), 'Test Client Documentation');
 
 		$pdf->AddPage();
 		$pdf->Image(PTS_CORE_STATIC_PATH . 'images/pts-308x160.png', 69, 85, 73, 38, 'PNG', 'https://www.phoronix-test-suite.com/');
 		$pdf->Ln(120);
 		$pdf->WriteStatement('www.phoronix-test-suite.com', 'C', 'https://www.phoronix-test-suite.com/');
 		$pdf->Ln(15);
-		$pdf->WriteBigHeaderCenter(pts_core::program_title(true));
+		$pdf->WriteBigHeaderCenter(pts_core::program_title());
 		$pdf->WriteHeaderCenter('User Manual');
 		//$pdf->WriteText($result_file->get_description());
 
@@ -71,9 +73,12 @@ class dump_documentation implements pts_option_interface
 			foreach($contents as &$option)
 			{
 				$sub_header = $dom->createElement('h3', $option[0]);
-				$em = $dom->CreateElement('em', '  ' . implode(' ', $option[1]));
-				$sub_header->appendChild($em);
+				if(!empty($option[1]))
+				{
+					$em = $dom->CreateElement('em', '  ' . implode(' ', $option[1]));
+					$sub_header->appendChild($em);
 
+				}
 				$body->appendChild($sub_header);
 
 				$p = $dom->createElement('p', $option[2]);
@@ -95,7 +100,7 @@ class dump_documentation implements pts_option_interface
 		$body = $dom->createElement('body');
 		$html->appendChild($body);
 
-		$p = $dom->createElement('p', 'The following list is the modules included with the Phoronix Test Suite that are intended to extend the functionality of pts-core. Some of these options have commands that can be run directly in a similiar manner to the other Phoronix Test Suite user commands. Some modules are just meant to be loaded directly by adding the module name to the AutoLoadModules tag in ~/.phoronix-test-suite/user-config.xml or via the PTS_MODULES environment variable. A list of available modules is also available by running ');
+		$p = $dom->createElement('p', 'The following list is the modules included with the Phoronix Test Suite that are intended to extend the functionality of pts-core. Some of these options have commands that can be run directly in a similar manner to the other Phoronix Test Suite user commands. Some modules are just meant to be loaded directly by adding the module name to the AutoLoadModules tag in ~/.phoronix-test-suite/user-config.xml or via the PTS_MODULES environment variable. A list of available modules is also available by running ');
 		$em = $dom->createElement('em', 'phoronix-test-suite list-modules.');
 		$p->appendChild($em);
 		$phr = $dom->createElement('hr');
@@ -120,21 +125,24 @@ class dump_documentation implements pts_option_interface
 
 				foreach($all_options as $key => $option)
 				{
-					$p = $dom->createElement('p', 'phoronix-test-suite ' . $module . '.' . str_replace('_', '-', $key));
+					$p = $dom->createElement('p');
+					$strong = $dom->createElement('strong', 'phoronix-test-suite ' . $module . '.' . str_replace('_', '-', $key));
+					$p->appendChild($strong);
 					$body->appendChild($p);
 				}
 			}
 
-			$vars = pts_module_manager::module_call($module, 'module_environmental_variables');
+			$vars = pts_module_manager::module_call($module, 'module_environment_variables');
 			if(is_array($vars) && count($vars) > 0)
 			{
-				$p = $dom->createElement('p', 'This module utilizes the following environmental variables: ' . implode(', ', $vars) . '.');
+				$p = $dom->createElement('p', 'This module utilizes the following environment variables: ' . implode(', ', $vars) . '.');
 				$body->appendChild($p);
 			}
 
             // If there is module_info text defined, add it here.
-			$moduleInfoText = trim(pts_module_manager::module_call($module, 'module_info'));
+		$moduleInfoText = pts_module_manager::module_call($module, 'module_info');
             if ( $moduleInfoText ) {
+            	$moduleInfoText = trim($moduleInfoText);
                 $moduleInfo = $dom->createElement('p', $moduleInfoText);
                 $body->appendChild($moduleInfo);
             }
@@ -204,7 +212,7 @@ class dump_documentation implements pts_option_interface
 
 		foreach(pts_virtual_test_suite::available_virtual_suites() as $virtual_suite)
 		{
-			$sub_header = $dom->createElement('h3', ucwords($virtual_suite->get_title()));
+			$sub_header = $dom->createElement('h3', $virtual_suite->get_title());
 			$em = $dom->CreateElement('em', '  ' . $virtual_suite->get_identifier());
 			$sub_header->appendChild($em);
 			$body->appendChild($sub_header);
@@ -214,6 +222,17 @@ class dump_documentation implements pts_option_interface
 		}
 
 		$dom->saveHTMLFile(PTS_PATH . 'documentation/stubs/55_virtual_suites.html');
+
+		$env_var_html = '<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Environment Variables</title>
+</head>
+<body>
+' . pts_env::get_documentation(false) . '
+</body>
+</html>';
+		file_put_contents(PTS_PATH . 'documentation/stubs/42_env_vars.html', $env_var_html);
 
 		// Load the HTML documentation
 		$md = new pts_md_template();

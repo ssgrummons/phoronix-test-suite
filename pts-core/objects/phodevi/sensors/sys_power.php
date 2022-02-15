@@ -62,8 +62,9 @@ class sys_power extends phodevi_sensor
 			if(self::windows_wmi_battery_status_discharge() > 0)
 			{
 				self::$windows_battery = true;
+				return true;
 			}
-			return true;
+			return false;
 		}
 		if(($m = getenv('WATTSUP_METER')) != false && is_readable($m))
 		{
@@ -197,7 +198,7 @@ class sys_power extends phodevi_sensor
 	}
 	private static function windows_wmi_battery_status_discharge()
 	{
-		$output = trim(shell_exec('powershell (Get-WmiObject -Namespace "root\wmi" BatteryStatus).DischargeRate'));
+		$output = trim(shell_exec('powershell -NoProfile (Get-WmiObject -Namespace "root\wmi" BatteryStatus).DischargeRate'));
 		if(!empty($output) && is_numeric($output) && $output > 0)
 		{
 			return $output;
@@ -355,11 +356,15 @@ class sys_power extends phodevi_sensor
 			}
 			else if(pts_client::executable_in_path('ioreg'))
 			{
-				$ioreg = trim(shell_exec("ioreg -l | grep LegacyBatteryInfo | cut -d '{' -f 2 | tr -d \} | tr ',' '=' | awk -F'=' '{print ($2*$10/10^22)}' 2>&1"));
+				$ioreg = shell_exec("ioreg -l | grep LegacyBatteryInfo | cut -d '{' -f 2 | tr -d \} | tr ',' '=' | awk -F'=' '{print ($2*$10/10^22)}' 2>&1");
 
-				if(is_numeric($ioreg) && $ioreg > 0)
+				if(!empty($ioreg))
 				{
-					$rate = $ioreg;
+					$ioreg = trim($ioreg);
+					if(is_numeric($ioreg) && $ioreg > 0)
+					{
+						$rate = $ioreg;
+					}
 				}
 			}
 		}

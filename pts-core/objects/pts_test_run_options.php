@@ -35,7 +35,7 @@ class pts_test_run_options
 		$user_args = array();
 		$text_args = array();
 
-		if(($cli_presets_env = pts_client::read_env('PRESET_OPTIONS')) != false)
+		if(($cli_presets_env = pts_env::read('PRESET_OPTIONS')) != false)
 		{
 			// To specify test options externally from an environment variable
 			// i.e. PRESET_OPTIONS='stream.run-type=Add' ./phoronix-test-suite benchmark stream
@@ -44,7 +44,7 @@ class pts_test_run_options
 			// Multiple preset options can be delimited with the PRESET_OPTIONS environment variable via a semicolon ;
 			$preset_selections = pts_client::parse_value_string_double_identifier($cli_presets_env);
 		}
-		if(($cli_presets_env_values = pts_client::read_env('PRESET_OPTIONS_VALUES')) != false)
+		if(($cli_presets_env_values = pts_env::read('PRESET_OPTIONS_VALUES')) != false)
 		{
 			// To specify test options externally from an environment variable
 			// i.e. PRESET_OPTIONS_VALUES='stream.run-type=Add' ./phoronix-test-suite benchmark stream
@@ -474,31 +474,33 @@ class pts_test_run_options
 					$option_values = array();
 					$option_names = array();
 
-					$mounts = is_file('/proc/mounts') ? file_get_contents('/proc/mounts') : null;
+					$mounts = is_file('/proc/mounts') ? file_get_contents('/proc/mounts') : '';
 
 					$option_values[] = '';
 					$option_names[] = 'Default Test Directory';
 
-					foreach($partitions_d as $partition_d)
+					if(!empty($mounts))
 					{
-						$mount_point = substr(($a = substr($mounts, strpos($mounts, $partition_d) + strlen($partition_d) + 1)), 0, strpos($a, ' '));
-						if(is_dir($mount_point) && is_writable($mount_point) && !in_array($mount_point, array('/boot', '/boot/efi')) && !in_array($mount_point, $option_values))
+						foreach($partitions_d as $partition_d)
 						{
-							$option_values[] = $mount_point;
-							$option_names[] = $mount_point; // ' [' . $partition_d . ']'
+							$mount_point = substr(($a = substr($mounts, strpos($mounts, $partition_d) + strlen($partition_d) + 1)), 0, strpos($a, ' '));
+							if(is_dir($mount_point) && is_writable($mount_point) && !in_array($mount_point, array('/boot', '/boot/efi')) && !in_array($mount_point, $option_values))
+							{
+								$option_values[] = $mount_point;
+								$option_names[] = $mount_point; // ' [' . $partition_d . ']'
+							}
 						}
-					}
-					
-					// ZFS only
-					$mounts_arr = explode("\n", $mounts);
-					
-					foreach($mounts_arr as $mount)
-					{
-						$mount_arr = explode(' ', $mount);
-						if(isset($mount_arr[2]) && $mount_arr[2] == 'zfs')
+
+						// ZFS only
+						$mounts_arr = explode("\n", $mounts);
+						foreach($mounts_arr as $mount)
 						{
-							$option_values[] = $mount_arr[1];
-							$option_names[] = $mount_arr[1];
+							$mount_arr = explode(' ', $mount);
+							if(isset($mount_arr[2]) && $mount_arr[2] == 'zfs')
+							{
+								$option_values[] = $mount_arr[1];
+								$option_names[] = $mount_arr[1];
+							}
 						}
 					}
 				}
@@ -737,7 +739,7 @@ class pts_test_run_options
 	}
 	public static function validate_test_arguments_compatibility($test_args, &$test_profile, &$error = null)
 	{
-		if(PTS_IS_CLIENT == false)
+		if(PTS_IS_CLIENT == false || empty($test_args))
 		{
 			return true;
 		}

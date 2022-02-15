@@ -3,8 +3,8 @@
 /*
 	Phoronix Test Suite
 	URLs: http://www.phoronix.com, http://www.phoronix-test-suite.com/
-	Copyright (C) 2008 - 2021, Phoronix Media
-	Copyright (C) 2008 - 2021, Michael Larabel
+	Copyright (C) 2008 - 2022, Phoronix Media
+	Copyright (C) 2008 - 2022, Michael Larabel
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,7 +24,6 @@ class pts_result_file
 {
 	protected $save_identifier = null;
 	protected $result_objects = null;
-	protected $extra_attributes = null;
 	protected $is_multi_way_inverted = false;
 	protected $file_location = false;
 
@@ -42,7 +41,6 @@ class pts_result_file
 	public function __construct($result_file = null, $read_only_result_objects = false, $parse_only_qualified_result_objects = false)
 	{
 		$this->save_identifier = $result_file;
-		$this->extra_attributes = array();
 		$this->systems = array();
 		$this->result_objects = array();
 		$this->ro_relation_map = array();
@@ -71,14 +69,14 @@ class pts_result_file
 			$this->internal_tags = self::clean_input($xml->Generated->InternalTags);
 			$this->reference_id = self::clean_input($xml->Generated->ReferenceID);
 			$this->preset_environment_variables = self::clean_input($xml->Generated->PreSetEnvironmentVariables);
-			$this->last_modified = $xml->Generated->LastModified;
+			$this->last_modified = self::clean_input($xml->Generated->LastModified);
 		}
 
 		if(isset($xml->System))
 		{
 			foreach($xml->System as $s)
 			{
-				$this->systems[] = new pts_result_file_system(self::clean_input($s->Identifier->__toString()), self::clean_input($s->Hardware->__toString()), self::clean_input($s->Software->__toString()), json_decode(self::clean_input($s->JSON), true), self::clean_input($s->User->__toString()), self::clean_input($s->Notes->__toString()), self::clean_input($s->TimeStamp->__toString()), self::clean_input($s->ClientVersion->__toString()), $this);
+				$this->systems[] = new pts_result_file_system(self::clean_input($s->Identifier->__toString()), self::clean_input($s->Hardware->__toString()), self::clean_input($s->Software->__toString()), json_decode(self::clean_input($s->JSON), true), self::clean_input($s->User->__toString()), self::clean_input($s->Notes->__toString()), self::clean_input($s->TimeStamp->__toString()), self::clean_input($s->TestClientVersion->__toString()), $this);
 			}
 		}
 
@@ -183,7 +181,7 @@ class pts_result_file
 	}
 	public function get_test_log_dir(&$result_object = null)
 	{
-		$log_dir = dirname($this->get_file_location());
+		$log_dir = $this->get_file_location() != null ? dirname($this->get_file_location()) : '';
 		if(empty($log_dir) || !is_dir($log_dir))
 		{
 			return false;
@@ -236,21 +234,9 @@ class pts_result_file
 		}
 		*/
 	}
-	public function default_result_folder_path()
-	{
-		return PTS_SAVE_RESULTS_PATH . $this->save_identifier . '/';
-	}
 	public function get_identifier()
 	{
 		return $this->save_identifier;
-	}
-	public function read_extra_attribute($key)
-	{
-		return isset($this->extra_attributes[$key]) ? $this->extra_attributes[$key] : false;
-	}
-	public function set_extra_attribute($key, $value)
-	{
-		$this->extra_attributes[$key] = $value;
 	}
 	public function add_system($system)
 	{
@@ -258,10 +244,6 @@ class pts_result_file
 		{
 			$this->systems[] = $system;
 		}
-	}
-	public function add_system_direct($identifier, $hw = null, $sw = null, $json = null, $user = null, $notes = null, $timestamp = null, $version = null)
-	{
-		$this->systems[] = new pts_result_file_system($identifier, $hw, $sw, $json, $user, $notes, $timestamp, $version, $this);
 	}
 	public function get_systems()
 	{
@@ -321,15 +303,61 @@ class pts_result_file
 	}
 	public function system_logs_available()
 	{
-		foreach($this->systems as &$s)
+		$has_system_logs = false;
+		$system_log_dir_or_zip = is_dir($this->get_system_log_dir(null, true)) || is_file($this->get_result_dir() . 'system-logs.zip');
+
+		if($system_log_dir_or_zip)
 		{
-			if($s->has_log_files())
+			if($this->get_system_count() == 1)
 			{
-				return true;
+				// If just one system in result file and there is a log, safe to assume it's for the associated run...
+				$has_system_logs = true;
+			}
+			else
+			{
+				foreach($this->systems as &$s)
+				{
+					if($s->has_log_files())
+					{
+						$has_system_logs = true;
+						break;
+					}
+				}
 			}
 		}
 
-		return false;
+		return $has_system_logs;
+	}
+	public function identifiers_with_system_logs()
+	{
+		$identifiers = array();
+		$system_log_dir = $this->get_system_log_dir(null, true);
+		if($system_log_dir && is_dir($system_log_dir))
+		{
+			foreach(pts_file_io::glob($system_log_dir . '/*') as $identifier_dir)
+			{
+				$identifiers[] = basename($identifier_dir);
+			}
+		}
+		else if($this->get_result_dir() && is_file($this->get_result_dir() . 'system-logs.zip'))
+		{
+			$zip = new ZipArchive();
+			$res = $zip->open($this->get_result_dir() . 'system-logs.zip');
+
+			if($res === true)
+			{
+				for($i = 0; $i < $zip->numFiles; $i++)
+				{
+					$index = explode('/', $zip->getNameIndex($i));
+					if(!empty($index[1]) && !in_array($index[1], $identifiers))
+					{
+						$identifiers[] = $index[1];
+					}
+				}
+				$zip->close();
+			}
+		}
+		return $identifiers;
 	}
 	public function get_system_count()
 	{
@@ -540,10 +568,6 @@ class pts_result_file
 
 		return $is_multi_way;
 	}
-	public function invert_multi_way_invert()
-	{
-		$this->is_multi_way_inverted = !$this->is_multi_way_inverted;
-	}
 	public function is_multi_way_inverted()
 	{
 		return $this->is_multi_way_inverted;
@@ -710,11 +734,13 @@ class pts_result_file
 	}
 	public function rename_run($from, $to, $rename_logs = true)
 	{
+		$renamed = false;
 		if($from == 'PREFIX')
 		{
 			foreach($this->systems as &$s)
 			{
 				$s->set_identifier($to . ': ' . $s->get_identifier());
+				$renamed = true;
 			}
 		}
 		else if($from == null)
@@ -724,6 +750,7 @@ class pts_result_file
 				foreach($this->systems as &$s)
 				{
 					$s->set_identifier($to);
+					$renamed = true;
 					break;
 				}
 			}
@@ -737,6 +764,7 @@ class pts_result_file
 				{
 					$found = true;
 					$s->set_identifier($to);
+					$renamed = true;
 					break;
 				}
 			}
@@ -758,6 +786,8 @@ class pts_result_file
 		{
 			$result->test_result_buffer->rename($from, $to);
 		}
+
+		return $renamed;
 	}
 	public function reorder_runs($new_order)
 	{
@@ -782,12 +812,14 @@ class pts_result_file
 	}
 	public function remove_run($remove)
 	{
+		$did_remove = false;
 		$remove = pts_arrays::to_array($remove);
 		foreach($this->systems as $i => &$s)
 		{
 			if(in_array($s->get_identifier(), $remove))
 			{
 				unset($this->systems[$i]);
+				$did_remove = true;
 			}
 		}
 
@@ -795,6 +827,7 @@ class pts_result_file
 		{
 			$result->test_result_buffer->remove($remove);
 		}
+		return $did_remove;
 	}
 	public function add_to_result_file(&$result_file, $only_merge_results_already_present = false)
 	{
@@ -867,7 +900,7 @@ class pts_result_file
 		$xml_writer = new nye_XmlWriter(null, $force_nice_formatting);
 		$xml_writer->addXmlNode('PhoronixTestSuite/Generated/Title', $this->get_title());
 		$xml_writer->addXmlNode('PhoronixTestSuite/Generated/LastModified', date('Y-m-d H:i:s', pts_client::current_time()));
-		$xml_writer->addXmlNode('PhoronixTestSuite/Generated/TestClient', pts_core::program_title(true));
+		$xml_writer->addXmlNode('PhoronixTestSuite/Generated/TestClient', pts_core::program_title());
 		$xml_writer->addXmlNode('PhoronixTestSuite/Generated/Description', $this->get_description());
 		$xml_writer->addXmlNodeWNE('PhoronixTestSuite/Generated/Notes', $this->get_notes());
 		$xml_writer->addXmlNodeWNE('PhoronixTestSuite/Generated/InternalTags', $this->get_internal_tags());
@@ -938,40 +971,18 @@ class pts_result_file
 			return false;
 		}
 
-		foreach($result_merges_to_combine as $i => &$merge_select)
+		foreach($result_merges_to_combine as &$result_file)
 		{
-			if(!($merge_select instanceof $merge_select))
+			if(!($result_file instanceof pts_result_file))
 			{
-				$merge_select = new pts_result_merge_select($merge_select);
-			}
-
-			if(!is_file($merge_select->get_result_file()) && !($merge_select->get_result_file() instanceof pts_result_file))
-			{
-				if(defined('PTS_SAVE_RESULTS_PATH') && is_file(PTS_SAVE_RESULTS_PATH . $merge_select->get_result_file() . '/composite.xml'))
+				if(defined('PTS_SAVE_RESULTS_PATH') && is_file(PTS_SAVE_RESULTS_PATH . $result_file . '/composite.xml'))
 				{
-					$merge_select->set_result_file(PTS_SAVE_RESULTS_PATH . $merge_select->get_result_file() . '/composite.xml');
+					$result_file = new pts_result_file(PTS_SAVE_RESULTS_PATH . $result_file . '/composite.xml', true);
 				}
 				else
 				{
-					unset($result_merges_to_combine[$i]);
+					continue;
 				}
-			}
-		}
-
-		if(empty($result_merges_to_combine))
-		{
-			return false;
-		}
-
-		foreach($result_merges_to_combine as &$merge_select)
-		{
-			if($merge_select->get_result_file() instanceof pts_result_file)
-			{
-				$result_file = $merge_select->get_result_file();
-			}
-			else
-			{
-				$result_file = new pts_result_file($merge_select->get_result_file(), true);
 			}
 
 			if($add_prefix)
@@ -991,10 +1002,6 @@ class pts_result_file
 				{
 					$result_file->rename_run('PREFIX', $add_prefix);
 				}
-			}
-			else if($merge_select->get_rename_identifier())
-			{
-				$result_file->rename_run(null, $merge_select->get_rename_identifier());
 			}
 
 			if($this->get_title() == null && $result_file->get_title() != null)
@@ -1106,7 +1113,10 @@ class pts_result_file
 		{
 			foreach($ro->get_run_times() as $si => $elapsed_time)
 			{
-				$run_times[$si] += $elapsed_time;
+				if(isset($run_times[$si]) && $elapsed_time > 0)
+				{
+					$run_times[$si] += $elapsed_time;
+				}
 			}
 		}
 

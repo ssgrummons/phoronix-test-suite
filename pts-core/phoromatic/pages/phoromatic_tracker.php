@@ -57,7 +57,6 @@ class phoromatic_tracker implements pts_webui_interface
 			$test_result_result = $stmt->execute();
 			$cutoff_time = is_numeric($cut_duration) ? strtotime('today -' . $cut_duration . ' days') : false;
 
-			$show_only_latest_systems = array();
 			$result_files = array();
 			while($test_result_result && $row = $test_result_result->fetchArray())
 			{
@@ -72,19 +71,12 @@ class phoromatic_tracker implements pts_webui_interface
 
 				// Add to result file
 				$system_name = phoromatic_server::system_id_to_name($row['SystemID']) . ': ' . $row['Trigger'];
-				$result_files[] = new pts_result_merge_select($composite_xml, null, $system_name);
-				if(!isset($show_only_latest_systems[$_SESSION['AccountID'] . $row['SystemID']]))
-				{
-					$show_only_latest_systems[$_SESSION['AccountID'] . $row['SystemID']] = new pts_result_merge_select($composite_xml, null, $system_name);
-				}
+				$rf = new pts_result_file($composite_xml);
+				$rf->rename_run(null, $system_name);
+				$result_files[] = $rf;
 			}
 
-			if(count($result_files) < 21)
-			{
-				$show_only_latest_systems = null;
-			}
-
-			$attributes = array('new_result_file_title' => phoromatic_schedule_id_to_name($row['ScheduleID']));
+			$attributes = array('new_result_file_title' => phoromatic_server::schedule_id_to_name($row['ScheduleID']));
 			$result_file = new pts_result_file(null, true);
 			$result_file->merge($result_files, $attributes);
 			$extra_attributes = array('reverse_result_buffer' => true, 'force_simple_keys' => true, 'force_line_graph_compact' => true, 'force_tracking_line_graph' => true);
@@ -184,7 +176,6 @@ class phoromatic_tracker implements pts_webui_interface
 						}
 						while($row = $result->fetchArray());
 					}
-
 
 			$main .= '</ul>
 			</div>';

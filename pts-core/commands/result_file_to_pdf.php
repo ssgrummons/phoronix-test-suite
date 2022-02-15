@@ -22,8 +22,8 @@
 
 class result_file_to_pdf implements pts_option_interface
 {
-	const doc_section = 'Result Management';
-	const doc_description = 'This option will read a saved test results file and output the system hardware and software information along with the results to a PDF file.';
+	const doc_section = 'Result Export';
+	const doc_description = 'This option will read a saved test results file and output the system hardware and software information along with the results to a PDF file. The outputted file appears in the user home directory or can otherwise be controlled via the OUTPUT_DIR and OUTPUT_FILE environment variables.';
 
 	public static function argument_checks()
 	{
@@ -42,12 +42,12 @@ class result_file_to_pdf implements pts_option_interface
 		$_REQUEST['force_format'] = 'PNG'; // Force to PNG renderer
 		$_REQUEST['svg_dom_gd_no_interlacing'] = true; // Otherwise FPDF will fail
 		$tdir = pts_client::create_temporary_directory();
-		pts_client::generate_result_file_graphs($r[0], $tdir);
+		pts_svg_dom_gd::generate_result_file_graphs($r[0], $tdir);
 
 		$result_file = new pts_result_file($r[0]);
-		$pdf_file = pts_core::user_home_directory() . $r[0] . '.pdf';
-		$pdf_output = pts_result_file_output::result_file_to_pdf($result_file, $pdf_file, 'F');
-		echo PHP_EOL . pts_client::cli_just_bold('Saved To: ') . $pdf_file . PHP_EOL;
+		$result_output = pts_result_file_output::result_file_to_pdf($result_file, '', 'S');
+
+		pts_client::save_output_handler($result_output, $r[0], 'pdf');
 	}
 }
 

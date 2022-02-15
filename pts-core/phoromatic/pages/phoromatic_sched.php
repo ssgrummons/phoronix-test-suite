@@ -3,8 +3,8 @@
 /*
 	Phoronix Test Suite
 	URLs: http://www.phoronix.com, http://www.phoronix-test-suite.com/
-	Copyright (C) 2014 - 2017, Phoronix Media
-	Copyright (C) 2014 - 2017, Michael Larabel
+	Copyright (C) 2014 - 2022, Phoronix Media
+	Copyright (C) 2014 - 2022, Michael Larabel
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 	You should have received a copy of the GNU General Public License
 	along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
-
 
 class phoromatic_sched implements pts_webui_interface
 {
@@ -41,6 +40,7 @@ class phoromatic_sched implements pts_webui_interface
 			return;
 
 		$is_new = true;
+		$env_var_edit = array();
 		if(!empty($PATH[0]) && is_numeric($PATH[0]))
 		{
 			$stmt = phoromatic_server::$db->prepare('SELECT * FROM phoromatic_schedules WHERE AccountID = :account_id AND ScheduleID = :schedule_id');
@@ -53,16 +53,20 @@ class phoromatic_sched implements pts_webui_interface
 			{
 				$is_new = false;
 			}
+			if(!empty($e_schedule['EnvironmentVariables']))
+			{
+				$env_var_edit = pts_strings::parse_value_string_vars($e_schedule['EnvironmentVariables']);
+			}
 		}
 
 		if(isset($_POST['schedule_title']) && !empty($_POST['schedule_title']))
 		{
 			$title = phoromatic_get_posted_var('schedule_title');
 			$description = phoromatic_get_posted_var('schedule_description');
-			$pre_install_context = phoromatic_get_posted_var('pre_install_set_context');
-			$post_install_context = phoromatic_get_posted_var('post_install_set_context');
-			$pre_run_context = phoromatic_get_posted_var('pre_run_set_context');
-			$post_run_context = phoromatic_get_posted_var('post_run_set_context');
+			$pre_install_set_context = phoromatic_get_posted_var('pre_install_set_context');
+			$post_install_set_context = phoromatic_get_posted_var('post_install_set_context');
+			$pre_run_set_context = phoromatic_get_posted_var('pre_run_set_context');
+			$post_run_set_context = phoromatic_get_posted_var('post_run_set_context');
 
 			$system_all = phoromatic_get_posted_var('system_all');
 			$run_target_systems = phoromatic_get_posted_var('run_on_systems', array());
@@ -98,8 +102,6 @@ class phoromatic_sched implements pts_webui_interface
 				}
 			}
 
-			// TODO XXX: Validation of input
-
 			// Need a unique schedule ID
 			if($is_new)
 			{
@@ -124,8 +126,16 @@ class phoromatic_sched implements pts_webui_interface
 				$public_key = $e_schedule['PublicKey'];
 			}
 
+			$env_vars = array();
+
+			foreach(pts_env::get_posted_options('phoromatic') as $ei => $ev)
+			{
+				array_push($env_vars, $ei . '=' . $ev);
+			}
+			$env_vars = implode(';', $env_vars);
+
 			// Add schedule
-			$stmt = phoromatic_server::$db->prepare('INSERT OR REPLACE INTO phoromatic_schedules (AccountID, ScheduleID, Title, Description, State, ActiveOn, RunAt, SetContextPreInstall, SetContextPostInstall, SetContextPreRun, SetContextPostRun, LastModifiedBy, LastModifiedOn, PublicKey, RunTargetGroups, RunTargetSystems, RunPriority) VALUES (:account_id, :schedule_id, :title, :description, :state, :active_on, :run_at, :context_pre_install, :context_post_install, :context_pre_run, :context_post_run, :modified_by, :modified_on, :public_key, :run_target_groups, :run_target_systems, :run_priority)');
+			$stmt = phoromatic_server::$db->prepare('INSERT OR REPLACE INTO phoromatic_schedules (AccountID, ScheduleID, Title, Description, State, ActiveOn, RunAt, SetContextPreInstall, SetContextPostInstall, SetContextPreRun, SetContextPostRun, LastModifiedBy, LastModifiedOn, PublicKey, RunTargetGroups, RunTargetSystems, RunPriority, EnvironmentVariables) VALUES (:account_id, :schedule_id, :title, :description, :state, :active_on, :run_at, :context_pre_install, :context_post_install, :context_pre_run, :context_post_run, :modified_by, :modified_on, :public_key, :run_target_groups, :run_target_systems, :run_priority, :environment_variables)');
 			$stmt->bindValue(':account_id', $_SESSION['AccountID']);
 			$stmt->bindValue(':schedule_id', $schedule_id);
 			$stmt->bindValue(':title', $title);
@@ -143,6 +153,7 @@ class phoromatic_sched implements pts_webui_interface
 			$stmt->bindValue(':run_target_groups', $run_target_groups);
 			$stmt->bindValue(':run_target_systems', $run_target_systems);
 			$stmt->bindValue(':run_priority', $run_priority);
+			$stmt->bindValue(':environment_variables', $env_vars);
 			$result = $stmt->execute();
 			phoromatic_add_activity_stream_event('schedule', $schedule_id, ($is_new ? 'added' : 'modified'));
 
@@ -154,7 +165,7 @@ class phoromatic_sched implements pts_webui_interface
 
 		echo phoromatic_webui_header_logged_in();
 		$main = '<h2>' . ($is_new ? 'Create' : 'Edit') . ' A Schedule</h2>
-		<p>A test schedule is used to facilitate automatically running a set of test(s)/suite(s) on either a routine timed basis or whenever triggered by an external script or process, e.g. Git/VCS commit, manually triggered, etc.</p>';
+		<p>A test schedule is used to facilitate automatically running a set of test(s) or suite(s) on either a routine timed basis or whenever triggered by an external script or process, e.g. Git/VCS commit, manually triggered, etc.</p>';
 
 		$main .= '<form action="' . $_SERVER['REQUEST_URI'] . '" name="add_test" id="add_test" method="post" enctype="multipart/form-data" onsubmit="return validate_schedule();">
 		<h3>Title:<span style="color:red;">*</span></h3>
@@ -222,52 +233,53 @@ class phoromatic_sched implements pts_webui_interface
 <tr>
   <td><h3>Time-Based Testing</h3><em>Time-based testing allows tests to automatically commence at a given time on a defined cycle each day/week. This option is primarly aimed for those wishing to run a set of benchmarks every morning or night or at another defined period.</em></td>
   <td><h3>Run Time:</h3>
-			<p><select name="schedule_hour" id="schedule_hour">';
+		<p><select name="schedule_hour" id="schedule_hour">';
 
-			if(!$is_new)
-			{
-				$run_at = explode('.', $e_schedule['RunAt']);
-				$days_active = !empty($e_schedule['ActiveOn']) ? explode(',', $e_schedule['ActiveOn']) : array();
-			}
+		if(!$is_new)
+		{
+			$run_at = explode('.', $e_schedule['RunAt']);
+			$days_active = !empty($e_schedule['ActiveOn']) ? explode(',', $e_schedule['ActiveOn']) : array();
+		}
 
-			for($i = 0; $i <= 23; $i++)
-			{
-				$i_f = (strlen($i) == 1 ? '0' . $i : $i);
-				$main .= '<option value="' . $i_f . '"' . (!$is_new && $run_at[0] == $i ? 'selected="selected" ' : null) . '>' . $i_f . '</option>';
-			}
+		for($i = 0; $i <= 23; $i++)
+		{
+			$i_f = (strlen($i) == 1 ? '0' . $i : $i);
+			$main .= '<option value="' . $i_f . '"' . (!$is_new && $run_at[0] == $i ? 'selected="selected" ' : null) . '>' . $i_f . '</option>';
+		}
 
-			$main .= '</select> <select name="schedule_minute" id="schedule_minute">';
+		$main .= '</select> <select name="schedule_minute" id="schedule_minute">';
 
-			for($i = 0; $i < 60; $i += 10)
-			{
-				$i_f = (strlen($i) == 1 ? '0' . $i : $i);
-				$main .= '<option value="' . $i_f . '"' . (!$is_new && $run_at[1] == $i ? 'selected="selected" ' : null) . '>' . $i_f . '</option>';
-			}
+		for($i = 0; $i < 60; $i += 10)
+		{
+			$i_f = (strlen($i) == 1 ? '0' . $i : $i);
+			$main .= '<option value="' . $i_f . '"' . (!$is_new && $run_at[1] == $i ? 'selected="selected" ' : null) . '>' . $i_f . '</option>';
+		}
 
-			$main .= '</select><h3>Active On:</h3><p>';
-			$week = array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
-			foreach($week as $index => $day)
-			{
-				$main .= '<input type="checkbox" name="days_active[]" value="' . $index . '"' . (!$is_new && in_array($index, $days_active) ? 'checked="checked" ' : null) . '/> ' . $day;
-			}
+		$main .= '</select><h3>Active On:</h3><p>';
+		$week = array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
+		foreach($week as $index => $day)
+		{
+			$main .= '<input type="checkbox" name="days_active[]" value="' . $index . '"' . (!$is_new && in_array($index, $days_active) ? 'checked="checked" ' : null) . '/> ' . $day;
+		}
 
-			$main .= '</p></td>
-</tr>
-<tr>
-  <td><h3>Trigger-Based Testing</h3><em>To carry out trigger-based testing, you can simply have an external process/script trigger (&quot;ping&quot;) a specialized URL whenever an event occurs to commence a new round of testing. This is the most customizable approach to having Phoromatic run tests on a system if you wish to have it occur whenever a Git/SVN commit takes place or other operations.</em></td>
-  <td><h3>Once creating the test schedule there will be a specialized URL you can use for &quot;pinging&quot; where you can pass it a Git commit hash, SVN revision number, date, or other unique identifiers to externally trigger the test schedules and systems to begin testing. This custom trigger is passed to any of the used context scripts for setting up the system in an appropriate state.</h3></td>
-</tr>
-<tr>
-  <td><h3>One-Time / Manual Testing</h3><em>Carrying out Phoromatic-controlled benchmark on no routine schedule, similar to the trigger-based testing.</em></td>
-  <td><h3>If you wish to only run a set of tests once on a given system or to do so seldom with the same set of tests, simply proceed with creating the test schedule without setting any run time / active days. When going to the web page for this test schedule there will be a button to trigger the tests to run on all affected systems.</h3></td>
-</tr>
-</table>
+		$main .= '</p></td>
+			</tr>
+			<tr>
+			  <td><h3>Trigger-Based Testing</h3><em>To carry out trigger-based testing, you can simply have an external process/script trigger (&quot;ping&quot;) a specialized URL whenever an event occurs to commence a new round of testing. This is the most customizable approach to having Phoromatic run tests on a system if you wish to have it occur whenever a Git/SVN commit takes place or other operations.</em></td>
+			  <td><h3>Once creating the test schedule there will be a specialized URL you can use for &quot;pinging&quot; where you can pass it a Git commit hash, SVN revision number, date, or other unique identifiers to externally trigger the test schedules and systems to begin testing. This custom trigger is passed to any of the used context scripts for setting up the system in an appropriate state.</h3></td>
+			</tr>
+			<tr>
+			  <td><h3>One-Time / Manual Testing</h3><em>Carrying out Phoromatic-controlled benchmark on no routine schedule, similar to the trigger-based testing.</em></td>
+			  <td><h3>If you wish to only run a set of tests once on a given system or to do so seldom with the same set of tests, simply proceed with creating the test schedule without setting any run time / active days. When going to the web page for this test schedule there will be a button to trigger the tests to run on all affected systems. One-time benchmarking can also be setup via the <a href="?benchmark">Run A Benchmark</a> page.</h3></td>
+			</tr>
+			</table>';
 
-		
-			<p align="right"><input name="submit" value="' . ($is_new ? 'Create' : 'Edit') . ' Schedule" type="submit" onclick="return pts_rmm_validate_schedule();" /></p>
+		$main .= (empty($env_var_edit) ? '<p><a id="env_var_options_show" onclick="javascript:document.getElementById(\'env_var_options\').style.display = \'block\'; javascript:document.getElementById(\'env_var_options_show\').style.display = \'none\'; ">Advanced Options</a></p> <div id="env_var_options" style="display: none;">' : '<div id="env_var_options">') . '<p>The advanced options require the Phoromatic clients be on the latest Phoronix Test Suite (10.8 or newer / Git). See the Phoronix Test Suite documentation for more information on these environment variables / advanced options.</p>' . pts_env::get_html_options('phoromatic', $env_var_edit) . '</div>';
+
+		$main .= '<p align="right"><input name="submit" value="' . ($is_new ? 'Create' : 'Edit') . ' Schedule" type="submit" onclick="return pts_rmm_validate_schedule();" /></p>
 			</form>';
-			echo phoromatic_webui_main($main);
-			echo phoromatic_webui_footer();
+		echo phoromatic_webui_main($main);
+		echo phoromatic_webui_footer();
 	}
 }
 

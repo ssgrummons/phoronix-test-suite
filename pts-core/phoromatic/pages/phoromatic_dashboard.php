@@ -20,7 +20,6 @@
 	along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 class phoromatic_dashboard implements pts_webui_interface
 {
 	public static function page_title()
@@ -38,7 +37,6 @@ class phoromatic_dashboard implements pts_webui_interface
 	public static function render_page_process($PATH)
 	{
 		echo phoromatic_webui_header_logged_in();
-
 		$stmt = phoromatic_server::$db->prepare('SELECT * FROM phoromatic_systems WHERE AccountID = :account_id AND State >= 0 ORDER BY LastCommunication DESC');
 		$stmt->bindValue(':account_id', $_SESSION['AccountID']);
 		$result = $stmt->execute();
@@ -96,15 +94,15 @@ class phoromatic_dashboard implements pts_webui_interface
 			echo '<h2>' . $row['LastIP'] . '</h2>';
 			echo '</div>';
 
-			$time_remaining = phoromatic_compute_estimated_time_remaining($row['EstimatedTimeForTask'], $row['LastCommunication']);
-			if($time_remaining)
+			$time_remaining = phoromatic_server::estimated_time_remaining_diff($row['EstimatedTimeForTask'], $row['LastCommunication']);
+			if($time_remaining > 0)
 			{
 				echo '<div style="float: left; text-align: center; margin: 0 6px;">';
 				echo '<h2>~ ' . $time_remaining . ' <sub>mins</sub></h2>';
 				echo '<p style="font-size: 90%; color: #FFF;"><em>Estimated Time Remaining</em></p>';
 				if(!empty($row['TimeToNextCommunication']))
 				{
-					echo '<pstyle="color: #FFF;"><em>' . phoromatic_compute_estimated_time_remaining_string($row['TimeToNextCommunication'], $row['LastCommunication'], 'To Next Communication') . '</em></p>';
+					echo '<pstyle="color: #FFF;"><em>' . phoromatic_server::estimated_time_remaining_string($row['TimeToNextCommunication'], $row['LastCommunication'], 'To Next Communication') . '</em></p>';
 				}
 				echo '</div>';
 			}

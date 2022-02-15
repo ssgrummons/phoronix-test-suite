@@ -48,13 +48,13 @@ class pts_module_manager
 
 		return $modules;
 	}
-	public static function modules_environmental_variables()
+	public static function modules_environment_variables()
 	{
 		$module_env_vars = array();
 		foreach(pts_module_manager::available_modules() as $module)
 		{
 			pts_module_manager::load_module($module);
-			$vars = pts_module_manager::module_call($module, 'module_environmental_variables');
+			$vars = pts_module_manager::module_call($module, 'module_environment_variables');
 
 			if(is_array($vars))
 			{
@@ -119,8 +119,7 @@ class pts_module_manager
 					break;
 				case pts_module::QUIT_PTS_CLIENT:
 					// Stop the Phoronix Test Suite immediately
-					pts_client::exit_client();
-					break;
+					exit(0);
 			}
 		}
 		pts_module_manager::set_current_module(null);
@@ -134,7 +133,8 @@ class pts_module_manager
 				if(strpos($ev, '=') != false)
 				{
 					list($var, $value) = pts_strings::trim_explode('=', $ev);
-					pts_client::pts_set_environment_variable($var, $value);
+					putenv($var . '=' . $value);
+					pts_env::set($var, $value);
 					pts_module_manager::var_store_add($var, $value);
 				}
 			}
@@ -212,8 +212,25 @@ class pts_module_manager
 					if(substr($module_method, 0, 2) == '__' && isset(self::$module_process[$module_method]))
 					{
 						$key_to_unset = array_search($module, self::$module_process[$module_method]);
-						unset(self::$module_process[$module_method][$key_to_unset]);
+						if($key_to_unset !== false)
+						{
+							unset(self::$module_process[$module_method][$key_to_unset]);
+						}
 					}
+				}
+			}
+		}
+	}
+	public static function detach_extra_modules($limit_modules_list)
+	{
+		$current_modules = pts_module_manager::attached_modules();
+		if(!empty($current_modules) && $current_modules != $limit_modules_list)
+		{
+			foreach($current_modules as $cm)
+			{
+				if(empty($limit_modules_list) || !in_array($cm, $limit_modules_list))
+				{
+					pts_module_manager::detach_module($cm);
 				}
 			}
 		}
@@ -290,16 +307,16 @@ class pts_module_manager
 	public static function detect_modules_to_load()
 	{
 		// Auto detect modules to load
-		$env_vars = pts_storage_object::read_from_file(PTS_CORE_STORAGE, 'environmental_variables_for_modules');
+		$env_vars = pts_storage_object::read_from_file(PTS_CORE_STORAGE, 'environment_variables_for_modules');
 
 		if($env_vars == false)
 		{
-			$env_vars = pts_module_manager::modules_environmental_variables();
+			$env_vars = pts_module_manager::modules_environment_variables();
 		}
 
 		foreach($env_vars as $env_var => $modules)
 		{
-			if(($e = pts_client::read_env($env_var)) != false && !empty($e))
+			if(($e = pts_env::read($env_var)) != false && !empty($e))
 			{
 				foreach($modules as $module)
 				{

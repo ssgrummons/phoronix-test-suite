@@ -128,14 +128,14 @@ abstract class pts_graph_core
 		{
 			$this->i['highlight_values'] = $extra_attributes['highlight_graph_values'];
 		}
-		else if(PTS_IS_CLIENT && pts_client::read_env('GRAPH_HIGHLIGHT') != false)
+		else if(PTS_IS_CLIENT && pts_env::read('GRAPH_HIGHLIGHT') != false)
 		{
-			//$this->i['highlight_values'] = pts_strings::comma_explode(pts_client::read_env('GRAPH_HIGHLIGHT'));
+			//$this->i['highlight_values'] = pts_strings::comma_explode(getenv('GRAPH_HIGHLIGHT'));
 			// We support GRAPH_HIGHLIGHT as a series of
 			// ID, ID=colorId or ID=color values, e.g.
 			// GRAPH_HIGHLIGHT="will_be_different,group1a=1,group1b=1,blue=#0000ff"
 			$this->i['highlight_values'] = array();
-			foreach(pts_strings::comma_explode(pts_client::read_env('GRAPH_HIGHLIGHT')) as $id)
+			foreach(pts_strings::comma_explode(getenv('GRAPH_HIGHLIGHT')) as $id)
 			{
 				$split = explode('=', $id);
 				if(count($split) == 2)
@@ -359,6 +359,11 @@ abstract class pts_graph_core
 	}
 	public function addSubTitle($sub_title)
 	{
+		if(empty($sub_title))
+		{
+			return;
+		}
+
 		$sub_titles = array_map('trim', explode('|', $sub_title));
 
 		foreach($sub_titles as $sub_title)

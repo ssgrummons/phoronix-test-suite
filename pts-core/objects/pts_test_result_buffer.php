@@ -90,6 +90,17 @@ class pts_test_result_buffer
 		$this->buffer_contains[$identifier . $value] = 1;
 		$this->buffer_by_identifier[$identifier] = (count($this->buffer_items) - 1);
 	}
+	public function has_incomplete_result()
+	{
+		foreach($this->buffer_items as &$buffer_item)
+		{
+			if($buffer_item->get_result_value() == '')
+			{
+				return true;
+			}
+		}
+		return false;
+	}
 	public function recalculate_buffer_items_min_max()
 	{
 		$this->min_value = 0;
@@ -439,24 +450,6 @@ class pts_test_result_buffer
 		}
 
 		return $identifier;
-	}
-	public function result_identifier_differences_only_numeric()
-	{
-		if(!isset($this->buffer_items[0]))
-		{
-			return false;
-		}
-
-		$first_result = trim(str_ireplace(array('SVN', 'Git', 'Dev'), '', pts_strings::remove_from_string($this->buffer_items[0]->get_result_identifier(), pts_strings::CHAR_NUMERIC | pts_strings::CHAR_DECIMAL | pts_strings::CHAR_DASH)));
-		for($i = 1;  $i < count($this->buffer_items); $i++)
-		{
-			$result = trim(str_ireplace(array('SVN', 'Git', 'Dev'), '', pts_strings::remove_from_string($this->buffer_items[$i]->get_result_identifier(), pts_strings::CHAR_NUMERIC | pts_strings::CHAR_DECIMAL | pts_strings::CHAR_DASH)));
-			if($result != $first_result)
-			{
-				return false;
-			}
-		}
-		return true;
 	}
 	public function get_max_precision()
 	{

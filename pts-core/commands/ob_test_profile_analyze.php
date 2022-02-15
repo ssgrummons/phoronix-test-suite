@@ -38,15 +38,15 @@ class ob_test_profile_analyze implements pts_option_interface
 			$qualified_identifier = $test_profile->get_identifier();
 
 			// Set some other things...
-			pts_client::pts_set_environment_variable('FORCE_TIMES_TO_RUN', 1);
-			pts_client::pts_set_environment_variable('TEST_RESULTS_NAME', $test_profile->get_title() . ' Testing ' . date('Y-m-d'));
-			pts_client::pts_set_environment_variable('TEST_RESULTS_IDENTIFIER', 'Sample Run');
-			pts_client::pts_set_environment_variable('TEST_RESULTS_DESCRIPTION', 1);
+			pts_env::set('FORCE_TIMES_TO_RUN', 1);
+			pts_env::set('TEST_RESULTS_NAME', $test_profile->get_title() . ' Testing ' . date('Y-m-d'));
+			pts_env::set('TEST_RESULTS_IDENTIFIER', 'Sample Run');
+			pts_env::set('TEST_RESULTS_DESCRIPTION', 1);
 
 			pts_openbenchmarking_client::override_client_setting('AutoUploadResults', false);
 			pts_openbenchmarking_client::override_client_setting('UploadSystemLogsByDefault', true);
 			pts_test_installer::standard_install($qualified_identifier, true);
-			if(!$test_profile->is_test_installed())
+			if($test_profile->test_installation == false || !$test_profile->test_installation->is_installed())
 			{
 				// Test has issues even installing, so skip it...
 				continue;
@@ -111,7 +111,7 @@ class ob_test_profile_analyze implements pts_option_interface
 						$march = substr($march, 0, $x);
 					}
 					pts_test_installer::standard_install($qualified_identifier, true);
-					if($test_profile->is_test_installed())
+					if($test_profile->test_installation && $test_profile->test_installation->is_installed())
 					{
 						$iu = array();
 						self::analyze_binary_instruction_usage($test_binary, $iu);
@@ -378,6 +378,14 @@ class ob_test_profile_analyze implements pts_option_interface
 				//$instruction_usage['OTHER'] += 1;
 			}
 		}
+
+		// Look for zmm register use to also find AVX-512 use by a binary
+		$zmm_usage = shell_exec('objdump -d ' . $binary . ' 2>1 | grep %zmm0');
+		if(strpos($zmm_usage, 'zmm0') !== false)
+		{
+			$instruction_usage['AVX512'][] = '(zmm register use)';
+		}
+
 		fclose($handle);
 		unlink($objdump_file);
 		foreach($instruction_usage as $instruction => $usage)

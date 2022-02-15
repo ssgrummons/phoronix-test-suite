@@ -3,8 +3,8 @@
 /*
 	Phoronix Test Suite
 	URLs: http://www.phoronix.com, http://www.phoronix-test-suite.com/
-	Copyright (C) 2008 - 2021, Phoronix Media
-	Copyright (C) 2008 - 2021, Michael Larabel
+	Copyright (C) 2008 - 2022, Phoronix Media
+	Copyright (C) 2008 - 2022, Michael Larabel
 	phodevi_cpu.php: The PTS Device Interface object for the CPU / processor
 
 	This program is free software; you can redistribute it and/or modify
@@ -297,29 +297,44 @@ class phodevi_cpu extends phodevi_device_interface
 		{
 			$scaling_governor = pts_file_io::file_get_contents('/sys/devices/system/cpu/cpu0/cpufreq/scaling_driver') . ' ';
 		}
-
 		if(is_file('/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'))
 		{
 			$scaling_governor .= pts_file_io::file_get_contents('/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor');
 		}
 
-		if(!empty($scaling_governor) && is_file('/sys/devices/system/cpu/cpufreq/boost'))
+		if(!empty($scaling_governor))
 		{
+			$append_notes = array();
+			if(is_file('/sys/devices/system/cpu/cpufreq/boost'))
+			{
+				$boost = pts_file_io::file_get_contents('/sys/devices/system/cpu/cpufreq/boost');
+				$boosted = null;
 
-			$boost = pts_file_io::file_get_contents('/sys/devices/system/cpu/cpufreq/boost');
-			$boosted = null;
+				if($boost === '0')
+				{
+					$boosted = 'Disabled';
+				}
+				else if($boost === '1')
+				{
+					$boosted = 'Enabled';
+				}
+				if($boosted != null)
+				{
+					$append_notes[] = 'Boost: ' . $boosted;
+				}
+			}
+			if(is_file('/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference'))
+			{
+				$epp = pts_file_io::file_get_contents('/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference');
 
-			if($boost === '0')
-			{
-				$boosted = 'Disabled';
+				if($epp != null)
+				{
+					$append_notes[] = 'EPP: ' . $epp;
+				}
 			}
-			else if($boost === '1')
+			if(!empty($append_notes))
 			{
-				$boosted = 'Enabled';
-			}
-			if($boosted != null)
-			{
-				$scaling_governor = trim($scaling_governor) . ' (Boost: ' . $boosted . ')';
+				$scaling_governor = trim($scaling_governor) . ' (' . implode(', ', $append_notes) . ')';
 			}
 		}
 
@@ -718,17 +733,23 @@ class phodevi_cpu extends phodevi_device_interface
 						case '0xd0d':
 							$new_info .= ' Cortex-A77';
 							break;
-						case '0xd47':
-							$new_info .= ' Cortex-A710';
-							break;
 						case '0xd0c':
 							$new_info .= ' Neoverse-N1';
 							break;
-						case '0xd49':
-							$new_info .= ' Cortex-N2';
+						case '0xd40':
+							$new_info .= ' Neoverse-V1';
 							break;
 						case '0xd44':
 							$new_info .= ' Cortex-X1';
+							break;
+						case '0xd4c':
+							$new_info .= ' Cortex-X1C';
+							break;
+						case '0xd47':
+							$new_info .= ' Cortex-A710';
+							break;
+						case '0xd48':
+							$new_info .= ' Cortex-X2';
 							break;
 						case '0xd49':
 							$new_info .= ' Neoverse-N2';
@@ -892,7 +913,7 @@ class phodevi_cpu extends phodevi_device_interface
 			'aes' => 'AES', // AES
 			'vaes' => 'VAES', // AES
 			'svm' => 'AMD SVM', // AMD SVM (Virtualization)
-			'vmx' => 'Intel VT-d', // Intel Virtualization
+			'vmx' => 'Intel VT-x', // Intel Virtualization
 			'fma' => 'FMA', // FMA Instruction Set
 			'fma3' => 'FMA3', // FMA3 Instruction Set
 			'fma4' => 'FMA4', // FMA4 Instruction Set
@@ -1100,16 +1121,65 @@ class phodevi_cpu extends phodevi_device_interface
 				96 => 'Zen 2',
 				104 => 'Zen 2',
 				113 => 'Zen 2',
+				144 => 'Zen 2',
 				),
 			25 => array(
 				0 => 'Zen 3',
 				1 => 'Zen 3',
+				16 => 'Zen 4',
+				17 => 'Zen 4',
+				18 => 'Zen 4',
+				19 => 'Zen 4',
+				20 => 'Zen 4',
+				21 => 'Zen 4',
+				22 => 'Zen 4',
+				23 => 'Zen 4',
+				24 => 'Zen 4',
+				25 => 'Zen 4',
+				26 => 'Zen 4',
+				27 => 'Zen 4',
+				28 => 'Zen 4',
+				29 => 'Zen 4',
+				30 => 'Zen 4',
+				31 => 'Zen 4',
 				32 => 'Zen 3',
 				33 => 'Zen 3',
 				47 => 'Zen 3',
 				48 => 'Zen 3',
 				50 => 'Zen 3',
+				64 => 'Zen 3', // Per Linux patches, Yellow Carp is 0x40 to 0x4f reserved
+				65 => 'Zen 3',
+				66 => 'Zen 3',
+				67 => 'Zen 3',
+				68 => 'Zen 3',
+				69 => 'Zen 3',
+				70 => 'Zen 3',
+				71 => 'Zen 3',
+				72 => 'Zen 3',
+				73 => 'Zen 3',
+				74 => 'Zen 3',
+				75 => 'Zen 3',
+				76 => 'Zen 3',
+				77 => 'Zen 3',
+				78 => 'Zen 3',
+				79 => 'Zen 3', // end of Yellow Carp
 				80 => 'Zen 3',
+				160 => 'Zen 4',
+				161 => 'Zen 4',
+				162 => 'Zen 4',
+				163 => 'Zen 4',
+				164 => 'Zen 4',
+				165 => 'Zen 4',
+				166 => 'Zen 4',
+				167 => 'Zen 4',
+				168 => 'Zen 4',
+				169 => 'Zen 4',
+				170 => 'Zen 4',
+				171 => 'Zen 4',
+				172 => 'Zen 4',
+				173 => 'Zen 4',
+				174 => 'Zen 4',
+				175 => 'Zen 4',
 				),
 			);
 
@@ -1184,6 +1254,8 @@ class phodevi_cpu extends phodevi_device_interface
 				165 => 'Comet Lake',
 				166 => 'Comet Lake',
 				167 => 'Rocket Lake',
+				168 => 'Rocket Lake',
+				183 => 'Raptor Lake',
 				),
 			15 => array(
 				1 => 'Clarksfield',

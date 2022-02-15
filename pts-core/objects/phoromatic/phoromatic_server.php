@@ -133,6 +133,26 @@ class phoromatic_server
 	{
 		return self::phoromatic_account_path($account_id) . 'suites/' . ($suite_id != null ? $suite_id . '/' : null);
 	}
+	public static function find_suite_file($account_id, $suite_name)
+	{
+		$suite_file = false;
+		$xml_path = phoromatic_server::phoromatic_account_suite_path($account_id, $suite_name) . 'suite-definition.xml';
+		if(is_file($xml_path))
+		{
+			// Local account-created suite
+			$suite_file = $xml_path;
+		}
+		else
+		{
+			if(is_file(PTS_TEST_SUITE_PATH . $suite_name . '/suite-definition.xml'))
+			{
+				// is a PTS suite
+				$suite_file = PTS_TEST_SUITE_PATH . $suite_name . '/suite-definition.xml';
+			}
+		}
+
+		return $suite_file;
+	}
 	public static function phoromatic_account_system_path($account_id, $system_id = null)
 	{
 		return self::phoromatic_account_path($account_id) . 'systems/' . ($system_id != null ? $system_id . '/' : null);
@@ -379,6 +399,24 @@ class phoromatic_server
 				// Change made 6 July 2021
 				self::$db->exec('ALTER TABLE phoromatic_account_settings ADD COLUMN AllowAnyDataForLogFiles INTEGER DEFAULT 0');
 				self::$db->exec('PRAGMA user_version = 41');
+			case 41:
+				// Change made November 2021
+				self::$db->exec('ALTER TABLE phoromatic_account_settings ADD COLUMN UploadInstallLogs INTEGER DEFAULT 0');
+				self::$db->exec('ALTER TABLE phoromatic_account_settings ADD COLUMN UploadRunLogs INTEGER DEFAULT 0');
+				self::$db->exec('PRAGMA user_version = 42');
+			case 42:
+				// Change made November 2021
+				self::$db->exec('ALTER TABLE phoromatic_schedules ADD COLUMN EnvironmentVariables TEXT');
+				self::$db->exec('PRAGMA user_version = 43');
+			case 43:
+				// Change made December 2021
+				self::$db->exec('ALTER TABLE phoromatic_account_settings ADD COLUMN GlobalEnvironmentVariables TEXT');
+				self::$db->exec('PRAGMA user_version = 44');
+			case 44:
+				// Change made December 2021
+				self::$db->exec('ALTER TABLE phoromatic_account_settings ADD COLUMN ProgressiveResultUploads INTEGER DEFAULT 0');
+				self::$db->exec('ALTER TABLE phoromatic_results ADD COLUMN InProgress INTEGER DEFAULT 0');
+				self::$db->exec('PRAGMA user_version = 45');
 		}
 		chmod($db_file, 0600);
 		if(!defined('PHOROMATIC_DB_INIT'))
@@ -493,7 +531,7 @@ class phoromatic_server
 	}
 	public static function compute_pprid($account_id, $system_id, $upload_time, $xml_upload_hash)
 	{
-		return base_convert(sha1($account_id . ' ' . $system_id . ' ' . $xml_upload_hash . ' ' . $upload_time), 10, 36);
+		return base_convert(sha1($account_id . ' ' . $system_id . ' ' . $xml_upload_hash . ' ' . $upload_time), 16, 36);
 	}
 	public static function system_id_to_name($system_id, $aid = false)
 	{
@@ -611,7 +649,7 @@ class phoromatic_server
 	}
 	public static function check_for_benchmark_ticket_result_match($benchmark_id, $account_id, $system_id, $ticket_issue_time)
 	{
-		$stmt = phoromatic_server::$db->prepare('SELECT UploadID FROM phoromatic_results WHERE AccountID = :account_id AND SystemID = :system_id AND BenchmarkTicketID = :benchmark_id AND UploadTime > :ticket_issue_time');
+		$stmt = phoromatic_server::$db->prepare('SELECT UploadID FROM phoromatic_results WHERE AccountID = :account_id AND SystemID = :system_id AND BenchmarkTicketID = :benchmark_id AND UploadTime > :ticket_issue_time AND InProgress = 0');
 		$stmt->bindValue(':account_id', $account_id);
 		$stmt->bindValue(':system_id', $system_id);
 		$stmt->bindValue(':benchmark_id', $benchmark_id);
@@ -627,7 +665,7 @@ class phoromatic_server
 	}
 	public static function check_for_triggered_result_match($schedule_id, $trigger_id, $account_id, $system_id)
 	{
-		$stmt = phoromatic_server::$db->prepare('SELECT UploadID FROM phoromatic_results WHERE AccountID = :account_id AND ScheduleID = :schedule_id AND Trigger = :trigger AND SystemID = :system_id');
+		$stmt = phoromatic_server::$db->prepare('SELECT UploadID FROM phoromatic_results WHERE AccountID = :account_id AND ScheduleID = :schedule_id AND Trigger = :trigger AND SystemID = :system_id AND InProgress = 0');
 		$stmt->bindValue(':account_id', $account_id);
 		$stmt->bindValue(':system_id', $system_id);
 		$stmt->bindValue(':schedule_id', $schedule_id);
@@ -996,8 +1034,10 @@ class phoromatic_server
 		{
 			$estimated_completion = strtotime($last_comm) + ($estimated_minutes * 60);
 
-			// Positive if ahead, negative number if the task elapsed
-			return ceil(($estimated_completion - time()) / 60);
+			if(time() < $estimated_completion)
+			{
+				return ceil(($estimated_completion - time()) / 60);
+			}
 		}
 
 		return 0;
@@ -1192,6 +1232,11 @@ class phoromatic_server
 	{
 		$last_comm = strtotime($last_communication);
 		return ((phoromatic_server::system_has_outstanding_jobs($account_id, $system_id, -600) && (($last_comm < (time() - 5400) && stripos($current_task, 'Running') === false) || $last_comm < (time() - 7200) || ($last_comm < (time() - 600) && stripos($current_task, 'Shutdown') !== false))) || ($last_comm < (time() -7200) && (stripos($current_task, 'running') !== false ||  stripos($current_task, 'setting') !== false))) || $current_task == 'Unknown';
+	}
+	public static function estimated_time_remaining_string($estimated_minutes, $last_comm, $append = 'Remaining')
+	{
+		$remaining = phoromatic_server::estimated_time_remaining_diff($estimated_minutes, $last_comm);
+		return $remaining > 0 ? '~' . pts_strings::plural_handler($remaining, 'Minute') . ' ' . $append : null;
 	}
 }
 

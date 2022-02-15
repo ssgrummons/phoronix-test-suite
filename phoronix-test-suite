@@ -28,7 +28,11 @@ then
 fi
 
 # Full path to root directory of the actual Phoronix Test Suite code
-if [ -d /Applications ]
+if [ -d /Applications ] && [ -d /usr/share/phoronix-test-suite/ ]
+then
+	# macOS has problems with the readlink code
+	export PTS_DIR="/usr/share/phoronix-test-suite/"
+elif [ -d /Applications ]
 then
 	# macOS has problems with the readlink code
 	export PTS_DIR=`pwd`
@@ -129,12 +133,6 @@ then
 elif which php-cli >/dev/null 2>&1 ;
 then
 	export PHP_BIN="php-cli"
-elif [ -x /usr/bin/hhvm ]
-then
-	export PHP_BIN="/usr/bin/hhvm"
-elif which hhvm >/dev/null 2>&1 ;
-then
-	export PHP_BIN="hhvm"
 else
 	export PHP_BIN=""
 fi
@@ -190,13 +188,19 @@ elif [ -x /usr/local/sbin/pkg ] || [ -x /usr/sbin/pkg ]
 then
 	# DragonFlyBSD and others
 	echo "The command to likely run for your operating system is: "
-	echo "# pkg install php74 php74-dom php74-zip php74-json php74-simplexml php74-openssl"
+	echo "# pkg install php80 php80-dom php80-zip php80-simplexml php80-openssl"
 	echo " "
 elif [ -x /usr/bin/swupd ]
 then
 	# Clear Linux
 	echo "The command to likely run for your operating system is: "
 	echo "# swupd bundle-add os-testsuite-phoronix"
+	echo " "
+elif [ -x /usr/pkg/bin/pkgin ]
+then
+	# NetBSD
+	echo "The command to likely run for your operating system is: "
+	echo "# pkgin php php-zip"
 	echo " "
 elif [ -x /usr/sbin/pkg_add ]
 then
@@ -269,6 +273,12 @@ then
 	# Gentoo
 	echo "The command to likely run for your operating system is: "
 	echo "# emerge dev-lang/php"
+	echo " "
+elif [ -x /usr/local/bin/brew ]
+then
+	# macOS Homebrew
+	echo "The command to likely run for your operating system is: "
+	echo "$ brew install php"
 	echo " "
 fi
 

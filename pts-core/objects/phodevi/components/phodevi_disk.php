@@ -37,6 +37,7 @@ class phodevi_disk extends phodevi_device_interface
 	}
 	public static function proc_mount_options($mount_point = null, $mounts = null)
 	{
+		$p = null;
 		$mount_options = false;
 		if(phodevi::is_windows())
 		{
@@ -58,7 +59,7 @@ class phodevi_disk extends phodevi_device_interface
 		{
 			$mount_point = dirname($mount_point);
 		}
-		while(($p = strrpos($mounts, ' ' . $mount_point . ' ')) === false && $mount_point != null && $mount_point != '/');
+		while($mounts != null && ($p = strrpos($mounts, ' ' . $mount_point . ' ')) === false && $mount_point != null && $mount_point != '/');
 
 		if($p)
 		{
@@ -107,7 +108,7 @@ class phodevi_disk extends phodevi_device_interface
 		}
 		else if(phodevi::is_windows())
 		{
-			$wmi = shell_exec('powershell "Get-WmiObject -Class Win32_Volume | Select-Object DriveLetter, BlockSize"');
+			$wmi = shell_exec('powershell -NoProfile "Get-WmiObject -Class Win32_Volume | Select-Object DriveLetter, BlockSize"');
 			if(($x = strpos($wmi, 'C:')) !== false)
 			{
 				$wmi = substr($wmi, ($x + 3));
@@ -309,8 +310,8 @@ class phodevi_disk extends phodevi_device_interface
  			$size = phodevi_windows_parser::get_wmi_object_multi('Win32_DiskDrive', 'Size');
 			for($i = 0; $i < count($models) && $i < count($size); $i++)
 			{
-				$s = $size[$i] / 1073741824;
-				$models[$i] = round($s) . 'GB ' . str_replace(array(' Device'), '', $models[$i]);
+				$s = is_numeric($size[$i]) ? round($size[$i] / 1073741824) . 'GB' : '';
+				$models[$i] = trim($s . ' ' . str_replace(array(' Device'), '', $models[$i]));
 			}
 			$disks = $models;
 		}

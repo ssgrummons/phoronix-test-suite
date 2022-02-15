@@ -30,7 +30,7 @@ class test_timeout extends pts_module_interface
 	protected static $timeout_after_mins = 'auto';
 	protected static $time_to_allow_for_current_test = 0;
 
-	public static function module_environmental_variables()
+	public static function module_environment_variables()
 	{
 		return array('TEST_TIMEOUT_AFTER');
 	}
@@ -43,7 +43,7 @@ class test_timeout extends pts_module_interface
 		// Make sure the file is removed to avoid potential problems if it was leftover from earlier run
 		pts_module::save_file('test_timeout', '');
 
-		if(($timeout = pts_module::read_variable('TEST_TIMEOUT_AFTER')))
+		if(($timeout = pts_env::read('TEST_TIMEOUT_AFTER')))
 		{
 			if((is_numeric($timeout) && $timeout > 0) || $timeout == 'auto')
 			{

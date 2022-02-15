@@ -43,6 +43,10 @@ class pts_network
 	{
 		return self::$disable_network_support == false;
 	}
+	public static function user_agent()
+	{
+		return 'PhoronixTestSuite/' . ucwords(strtolower(PTS_CODENAME));
+	}
 	public static function http_get_contents($url, $override_proxy = false, $override_proxy_port = false, $override_proxy_user = false, $override_proxy_pw = false, $http_timeout = -1)
 	{
 		if(!pts_network::network_support_available())
@@ -98,18 +102,17 @@ class pts_network
 		{
 			$download = 'http://' . $download;
 		}
-		else if(getenv('NO_HTTPS') != false)
+		else if(PTS_IS_CLIENT && pts_env::read('NO_HTTPS') != false)
 		{
 			// On some platforms like DragonFly 4.2 ran into problem of all HTTPS downloads failing
 			$download = str_replace('https://', 'http://', $download);
 		}
 
-		if(PTS_IS_CLIENT && strpos(phodevi::read_property('system', 'operating-system'), ' 7') === false && function_exists('curl_init') && stripos(PTS_PHP_VERSION, 'hiphop') === false)
+		if(PTS_IS_CLIENT && strpos(phodevi::read_property('system', 'operating-system'), ' 7') === false && function_exists('curl_init'))
 		{
 			// XXX: RHEL/EL 7.6 PHP packages introduced a segv when using CURL... Until that's resolved, just blacklist " 7"
 			// as unknown when it will be fixed, but at least there is non-CURL codepath supported fine
 			// " 7" is a bit liberal but also hard due to various EL7 downstreams
-			// XXX: Facebook HipHop HHVM currently seems to have problems with PHP CURL
 			$return_state = pts_network::curl_download($download, $to);
 		}
 		else
@@ -142,7 +145,7 @@ class pts_network
 		curl_setopt($cr, CURLOPT_FOLLOWLOCATION, true);
 		curl_setopt($cr, CURLOPT_CONNECTTIMEOUT, self::$network_timeout);
 		curl_setopt($cr, CURLOPT_BUFFERSIZE, 64000);
-		curl_setopt($cr, CURLOPT_USERAGENT, pts_core::codename(true));
+		curl_setopt($cr, CURLOPT_USERAGENT, pts_network::user_agent());
 		curl_setopt($cr, CURLOPT_CAPATH, PTS_CORE_STATIC_PATH . 'certificates/');
 		curl_setopt($cr, CURLOPT_SSL_VERIFYPEER, false);
 
@@ -157,20 +160,16 @@ class pts_network
 			curl_setopt($cr, CURLOPT_REFERER, 'http://www.phoronix-test-suite.com/');
 		}
 
+		/*
 		if(strpos($download, 'https://openbenchmarking.org/') !== false)
 		{
 			curl_setopt($cr, CURLOPT_SSL_VERIFYHOST, 2);
 			curl_setopt($cr, CURLOPT_CAINFO, PTS_CORE_STATIC_PATH . 'certificates/openbenchmarking-server.pem');
 		}
-		else if(strpos($download, 'https://www.phoromatic.com/') !== false)
-		{
-			curl_setopt($cr, CURLOPT_SSL_VERIFYHOST, 2);
-			curl_setopt($cr, CURLOPT_CAINFO, PTS_CORE_STATIC_PATH . 'certificates/phoromatic-com.pem');
-		}
+		*/
 
 		if(defined('CURLOPT_PROGRESSFUNCTION'))
 		{
-			// CURLOPT_PROGRESSFUNCTION only seems to work with PHP 5.3+, but is not working with HipHop HHVM ~2.0.1
 			curl_setopt($cr, CURLOPT_NOPROGRESS, false);
 			curl_setopt($cr, CURLOPT_PROGRESSFUNCTION, array('pts_network', 'curl_status_callback'));
 		}
@@ -253,11 +252,11 @@ class pts_network
 			$parameters['http']['timeout'] = self::$network_timeout;
 		}
 
-		$parameters['http']['user_agent'] = pts_core::codename(true);
+		$parameters['http']['user_agent'] = pts_network::user_agent();
 
 		if($proxy_user != false && !empty($proxy_user))
 		{
-			$password = pts_strings::hex_to_str($proxy_password);
+			$password = self::hex_to_str($proxy_password);
 			$parameters['http']['header'] = 'Proxy-Authorization: Basic ' . base64_encode($proxy_user . ':' . $password);
 		}
 		else
@@ -268,6 +267,15 @@ class pts_network
 		$stream_context = stream_context_create($parameters);
 
 		return $stream_context;
+	}
+	public static function hex_to_str($hex)
+	{
+		$string='';
+		for($i = 0; $i < strlen($hex) - 1; $i += 2)
+		{
+			$string .= chr(hexdec($hex[$i] . $hex[($i + 1)]));
+		}
+		return $string;
 	}
 
 	//
@@ -297,7 +305,7 @@ class pts_network
 				break;
 		}
 	}
-	private static function curl_status_callback($curl_resource, $download_size, $downloaded, $upload_size, $uploaded)
+	private static function curl_status_callback($curl_resource, $download_size, $downloaded, $upload_size = 0, $uploaded = 0)
 	{
 		static $last_float = -1;
 		$downloaded_float = $download_size == 0 ? 0 : $downloaded / $download_size;

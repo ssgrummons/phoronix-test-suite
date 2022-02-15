@@ -42,7 +42,7 @@ class pts_module_interface
 	{
 		return $module_options_array;
 	}
-	public static function module_environmental_variables()
+	public static function module_environment_variables()
 	{
 		return array();
 	}
@@ -219,6 +219,11 @@ class pts_module_interface
 	public static function __event_user_error($obj = null)
 	{
 		// TODO use __event_user_error
+		return;
+	}
+	public static function __event_pre_run_error($obj = null)
+	{
+		// Passed is an array with the test profile and error message. The pre-run errors are warnings/errors prior to actual test execution phase
 		return;
 	}
 	public static function __event_run_error($obj = null)

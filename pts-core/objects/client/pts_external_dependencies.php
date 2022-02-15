@@ -22,6 +22,8 @@
 
 class pts_external_dependencies
 {
+	protected static $logger = null;
+
 	public static function packages_that_provide($file)
 	{
 		$pkg_vendor = self::vendor_identifier('package-list');
@@ -57,10 +59,12 @@ class pts_external_dependencies
 	public static function install_dependencies(&$test_profiles, $no_prompts = false, $skip_tests_with_missing_dependencies = false, $report_progress = false)
 	{
 		// PTS External Dependencies install on distribution
-		if(pts_client::read_env('NO_EXTERNAL_DEPENDENCIES') != false || pts_client::read_env('SKIP_EXTERNAL_DEPENDENCIES') == 1)
+		if(pts_env::read('NO_EXTERNAL_DEPENDENCIES') != false || pts_env::read('SKIP_EXTERNAL_DEPENDENCIES') == 1)
 		{
 			return true;
 		}
+
+		self::$logger = new pts_logger(null, 'phoronix-test-suite-dependencies.log', false);
 
 		// Find all the tests that need to be checked
 		$tests_to_check = array();
@@ -71,6 +75,7 @@ class pts_external_dependencies
 				$tests_to_check[] = $test_profile;
 			}
 		}
+		self::$logger->log('Evaluating dependencies needed for: ' . implode(' ', $tests_to_check));
 
 		// Find all of the POSSIBLE test dependencies
 		$required_external_dependencies = array();
@@ -122,9 +127,9 @@ class pts_external_dependencies
 		}
 
 		// Does the user wish to skip any particular dependencies?
-		if(pts_client::read_env('SKIP_EXTERNAL_DEPENDENCIES'))
+		if(($dependencies_to_skip = pts_env::read('SKIP_EXTERNAL_DEPENDENCIES')))
 		{
-			$dependencies_to_skip = explode(',', pts_client::read_env('SKIP_EXTERNAL_DEPENDENCIES'));
+			$dependencies_to_skip = explode(',', $dependencies_to_skip);
 
 			foreach($dependencies_to_skip as $dependency_name)
 			{
@@ -181,6 +186,7 @@ class pts_external_dependencies
 		// Do the actual dependency install process
 		if(count($dependencies_to_install) > 0)
 		{
+			self::$logger->log('External dependencies requested for install: ' . implode(' ', $dependencies_to_install));
 			self::install_packages_on_system($dependencies_to_install);
 		}
 
@@ -437,6 +443,7 @@ class pts_external_dependencies
 					{
 						$needed_os_packages[] = $pkg;
 					}
+					self::$logger->log('System dependency solver for "' . $file . '" found: ' . implode(' ', $processed_pkgs));
 				}
 			}
 			$i++;

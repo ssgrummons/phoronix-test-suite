@@ -78,10 +78,17 @@ class microsoft_dependency_handler implements pts_dependency_handler
 		}
 		return $packages_needed;
 	}
-	protected static function file_download_location()
+	public static function file_download_location()
 	{
 		// TODO determine what logic may need to be applied or if to punt it as an option, etc
-		return getenv('USERPROFILE') . '\Downloads\\';
+		$download_directory = trim(shell_exec('powershell -NoProfile "(New-Object -ComObject Shell.Application).NameSpace(\'shell:Downloads\').Self.Path"'));
+		
+		// Fall back to user profile directory
+		if(empty($download_directory) || !is_dir($download_directory)) {
+			return getenv('USERPROFILE') . '\Downloads\\';
+		}
+
+		return pts_strings::add_trailing_slash($download_directory);
 	}
 	protected static function get_cygwin()
 	{
@@ -160,4 +167,3 @@ class microsoft_dependency_handler implements pts_dependency_handler
 
 
 ?>
-

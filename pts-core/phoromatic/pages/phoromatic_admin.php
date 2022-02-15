@@ -3,8 +3,8 @@
 /*
 	Phoronix Test Suite
 	URLs: http://www.phoronix.com, http://www.phoronix-test-suite.com/
-	Copyright (C) 2014 - 2018, Phoronix Media
-	Copyright (C) 2014 - 2018, Michael Larabel
+	Copyright (C) 2014 - 2022, Phoronix Media
+	Copyright (C) 2014 - 2022, Michael Larabel
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 	You should have received a copy of the GNU General Public License
 	along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
-
 
 class phoromatic_admin implements pts_webui_interface
 {
@@ -71,10 +70,12 @@ class phoromatic_admin implements pts_webui_interface
 		}
 		else if(isset($_POST['register_username']) && isset($_POST['register_password']) && isset($_POST['register_password_confirm']) && isset($_POST['register_email']))
 		{
+			phoromatic_quit_if_invalid_input_found(array('register_username', 'register_password', 'register_password_confirm', 'register_email', 'seed_accountid'));
 			$new_account = create_new_phoromatic_account($_POST['register_username'], $_POST['register_password'], $_POST['register_password_confirm'], $_POST['register_email'], (isset($_POST['seed_accountid']) ? $_POST['seed_accountid'] : null));
 		}
 		else if(isset($_POST['email_all_subject']) && isset($_POST['email_all_message']) && !empty($_POST['email_all_message']))
 		{
+			phoromatic_quit_if_invalid_input_found(array('email_all_subject', 'email_all_message'));
 			$stmt = phoromatic_server::$db->prepare('SELECT * FROM phoromatic_users ORDER BY UserName ASC');
 			$result = $stmt->execute();
 
@@ -158,7 +159,7 @@ class phoromatic_admin implements pts_webui_interface
 				$main .= '<p>';
 			}
 
-			$main .= $offset . ' <strong>' . $row['UserName'] . '</strong> (<em>' . $level . '</em>) <strong>Created On:</strong> ' . phoromatic_user_friendly_timedate($row['CreatedOn']) . ' <strong>Last Log-In:</strong> ' . ($row['LastLogin'] != null ? phoromatic_user_friendly_timedate($row['LastLogin']) : 'N/A') . ($row['AdminLevel'] == 1 ? ' [<strong>ACCOUNT ID:</strong> ' . $row['AccountID'] . ']' : null) . '<br />';
+			$main .= $offset . ' <strong>' . $row['UserName'] . '</strong> (<em>' . $level . '</em>) <strong>Created On:</strong> ' . phoromatic_server::user_friendly_timedate($row['CreatedOn']) . ' <strong>Last Log-In:</strong> ' . ($row['LastLogin'] != null ? phoromatic_server::user_friendly_timedate($row['LastLogin']) : 'N/A') . ($row['AdminLevel'] == 1 ? ' [<strong>ACCOUNT ID:</strong> ' . $row['AccountID'] . ']' : null) . '<br />';
 			$plevel = $row['AdminLevel'];
 			$user_list[$row['UserName']] = $row['AdminLevel'];
 		}
@@ -206,7 +207,6 @@ class phoromatic_admin implements pts_webui_interface
 		<sup>3</sup> A valid email address is required for notifications, password reset, and other verification purposes.<br />
 		<sup>4</sup> The account ID field is optional and is used to pre-seed the account identifier for advanced purposes. The field must be six characters. Leave this field blank if you are unsure.<br />
 						</p>';
-
 
 		//
 		$server_log = explode(PHP_EOL, file_get_contents(getenv('PTS_PHOROMATIC_LOG_LOCATION')));

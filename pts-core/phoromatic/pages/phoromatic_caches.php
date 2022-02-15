@@ -20,7 +20,6 @@
 	along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 class phoromatic_caches implements pts_webui_interface
 {
 	public static function page_title()
@@ -86,7 +85,7 @@ class phoromatic_caches implements pts_webui_interface
 		}
 		else
 		{
-			$main .= '<h3>No download cache file could be found; on the Phoromatic Server you should run <strong>phoronix-test-suite make-download-cache</strong>.</h3>'; // TODO XXX implement from the GUI
+			$main .= '<h3>No download cache file could be found; on the Phoromatic Server you should run <strong>phoronix-test-suite make-download-cache</strong>. See the <a href="https://github.com/phoronix-test-suite/phoronix-test-suite/tree/master/documentation">documentation</a> for more information on download-cache setup.</h3>'; // TODO XXX implement from the GUI
 		}
 
 		$main .= '<hr /><h2>OpenBenchmarking.org Cache Data</h2>';

@@ -22,7 +22,7 @@
 
 class diagnostics implements pts_option_interface
 {
-	const doc_section = 'System';
+	const doc_section = 'Debugging';
 	const doc_description = 'This option will print information that is useful to developers when debugging problems with the Phoronix Test Suite and/or test profiles and test suites.';
 
 	public static function run($r)
@@ -42,8 +42,8 @@ class diagnostics implements pts_option_interface
 		{
 			echo pts_client::cli_just_bold($var) . ' = ' . $var_value . PHP_EOL;
 		}
-		echo PHP_EOL . 'Environmental Variables (accessible via test scripts):' . PHP_EOL;
-		foreach(pts_client::environmental_variables() as $var => $var_value)
+		echo PHP_EOL . 'Environment Variables (accessible via test scripts):' . PHP_EOL;
+		foreach(pts_client::environment_variables() as $var => $var_value)
 		{
 			echo pts_client::cli_just_bold($var) . ' = ' . $var_value . PHP_EOL;
 		}

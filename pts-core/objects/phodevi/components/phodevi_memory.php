@@ -80,6 +80,11 @@ class phodevi_memory extends phodevi_device_interface
 
 			if($mem_speed == false)
 			{
+				$mem_speed = phodevi_linux_parser::read_dmidecode('memory', 'Memory Device', 'Configured Memory Speed', true, array('Unknown', 'Undefined'));
+			}
+
+			if($mem_speed == false)
+			{
 				// "Speed" only reports stock frequency where "Configured Clock Speed" should report the over/underclocked memory
 				$mem_speed = phodevi_linux_parser::read_dmidecode('memory', 'Memory Device', 'Speed', true, array('Unknown', 'Undefined'));
 			}
@@ -248,6 +253,10 @@ class phodevi_memory extends phodevi_device_interface
 					if($ram_in_gb % 2 == 1)
 					{
 						$ram_in_gb++;
+					}
+					if($ram_in_gb > 100 && $ram_in_gb % 16 !== 0)
+					{
+						$ram_in_gb += 16 - ($ram_in_gb % 16);
 					}
 					if($ram_in_gb >= 6)
 					{

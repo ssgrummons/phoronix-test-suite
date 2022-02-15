@@ -3,8 +3,8 @@
 /*
 	Phoronix Test Suite
 	URLs: http://www.phoronix.com, http://www.phoronix-test-suite.com/
-	Copyright (C) 2008 - 2021, Phoronix Media
-	Copyright (C) 2008 - 2021, Michael Larabel
+	Copyright (C) 2008 - 2022, Phoronix Media
+	Copyright (C) 2008 - 2022, Michael Larabel
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -42,21 +42,22 @@ class phoromatic_systems implements pts_webui_interface
 
 		if(!PHOROMATIC_USER_IS_VIEWER && !empty($PATH[0]) && isset($_POST['system_title']) && !empty($_POST['system_title']) && isset($_POST['system_description']) && isset($_POST['system_state']))
 		{
+			phoromatic_quit_if_invalid_input_found(array('system_title', 'system_description', 'system_state'));
 			$stmt = phoromatic_server::$db->prepare('UPDATE phoromatic_systems SET Title = :title, Description = :description, State = :state, CurrentTask = \'Awaiting Task\', BlockPowerOffs = :block_power_offs WHERE AccountID = :account_id AND SystemID = :system_id');
 			$stmt->bindValue(':account_id', $_SESSION['AccountID']);
 			$stmt->bindValue(':system_id', $PATH[0]);
-			$stmt->bindValue(':title', $_POST['system_title']);
-			$stmt->bindValue(':description', $_POST['system_description']);
-			$stmt->bindValue(':state', $_POST['system_state']);
+			$stmt->bindValue(':title', pts_strings::simple($_POST['system_title']));
+			$stmt->bindValue(':description', pts_strings::sanitize($_POST['system_description']));
+			$stmt->bindValue(':state', pts_strings::simple($_POST['system_state']));
 			$stmt->bindValue(':block_power_offs', $_POST['block_power_offs']);
 			$stmt->execute();
 		}
-		if(!PHOROMATIC_USER_IS_VIEWER && !empty($PATH[0]) && isset($_POST['maintenance_mode']))
+		if(!PHOROMATIC_USER_IS_VIEWER && !empty($PATH[0]) && isset($_POST['maintenance_mode']) && verify_submission_token())
 		{
 			$stmt = phoromatic_server::$db->prepare('UPDATE phoromatic_systems SET MaintenanceMode = :maintenance_mode WHERE AccountID = :account_id AND SystemID = :system_id');
 			$stmt->bindValue(':account_id', $_SESSION['AccountID']);
 			$stmt->bindValue(':system_id', $PATH[0]);
-			$stmt->bindValue(':maintenance_mode', $_POST['maintenance_mode']);
+			$stmt->bindValue(':maintenance_mode', pts_strings::simple($_POST['maintenance_mode']));
 			$stmt->execute();
 		}
 		if(!PHOROMATIC_USER_IS_VIEWER && !empty($PATH[0]) && isset($_GET['clear_system_warnings']))
@@ -66,7 +67,7 @@ class phoromatic_systems implements pts_webui_interface
 			$stmt->bindValue(':system_id', $PATH[0]);
 			$stmt->execute();
 		}
-		if(!PHOROMATIC_USER_IS_VIEWER && !empty($PATH[0]) && isset($_POST['tick_thread_reboot']))
+		if(!PHOROMATIC_USER_IS_VIEWER && !empty($PATH[0]) && isset($_POST['tick_thread_reboot']) && verify_submission_token())
 		{
 			$stmt = phoromatic_server::$db->prepare('UPDATE phoromatic_systems SET TickThreadEvent = :event WHERE AccountID = :account_id AND SystemID = :system_id');
 			$stmt->bindValue(':account_id', $_SESSION['AccountID']);
@@ -74,7 +75,7 @@ class phoromatic_systems implements pts_webui_interface
 			$stmt->bindValue(':event', time() . ':reboot');
 			$stmt->execute();
 		}
-		if(!PHOROMATIC_USER_IS_VIEWER && !empty($PATH[0]) && isset($_POST['tick_thread_halt']))
+		if(!PHOROMATIC_USER_IS_VIEWER && !empty($PATH[0]) && isset($_POST['tick_thread_halt']) && verify_submission_token())
 		{
 			$stmt = phoromatic_server::$db->prepare('UPDATE phoromatic_systems SET TickThreadEvent = :event WHERE AccountID = :account_id AND SystemID = :system_id');
 			$stmt->bindValue(':account_id', $_SESSION['AccountID']);
@@ -91,6 +92,7 @@ class phoromatic_systems implements pts_webui_interface
 		}
 		if(!PHOROMATIC_USER_IS_VIEWER && !empty($PATH[0]) && isset($_POST['system_var_names'])&& isset($_POST['system_var_values']))
 		{
+			phoromatic_quit_if_invalid_input_found(array('system_var_names', 'system_var_values'));
 			$vars = array();
 			foreach($_POST['system_var_names'] as $i => $name)
 			{
@@ -165,6 +167,9 @@ class phoromatic_systems implements pts_webui_interface
 					case 1:
 						$state = 'Active';
 						break;
+					default:
+						$state = 'Unknown';
+						break;
 				}
 
 				$main .= '<hr />';
@@ -177,7 +182,7 @@ class phoromatic_systems implements pts_webui_interface
 				{
 					$status_extra = ' - <a href="/?benchmark/' . $row['CurrentProcessTicket'] . '">' . phoromatic_server::ticket_id_to_name($row['CurrentProcessTicket']) . '</a>';
 				}
-				$info_table = array('Status:' => $row['CurrentTask'] . $status_extra, 'Last Communication:' => phoromatic_user_friendly_timedate($row['LastCommunication']), 'Estimated Time Left For Task: ' => phoromatic_compute_estimated_time_remaining_string($row['EstimatedTimeForTask'], $row['LastCommunication']), 'State:' => $state, 'Phoronix Test Suite Client:' => $row['ClientVersion'], 'Initial Creation:' => phoromatic_user_friendly_timedate($row['CreatedOn']), 'System ID:' => $row['SystemID'], 'Last IP:' => $row['LastIP'], 'MAC Address:' => $row['NetworkMAC'], 'Wake-On-LAN Information:' => (empty($row['NetworkWakeOnLAN']) ? 'N/A' : $row['NetworkWakeOnLAN']), 'Power-Off Sequence Permitted: ' => ($row['BlockPowerOffs'] == 1 ? 'Blocked' : 'Permitted'));
+				$info_table = array('Status:' => $row['CurrentTask'] . $status_extra, 'Last Communication:' => phoromatic_server::user_friendly_timedate($row['LastCommunication']), 'Estimated Time Left For Task: ' => phoromatic_server::estimated_time_remaining_string($row['EstimatedTimeForTask'], $row['LastCommunication']), 'State:' => $state, 'Phoronix Test Suite Client:' => $row['ClientVersion'], 'Initial Creation:' => phoromatic_server::user_friendly_timedate($row['CreatedOn']), 'System ID:' => $row['SystemID'], 'Last IP:' => $row['LastIP'], 'MAC Address:' => $row['NetworkMAC'], 'Wake-On-LAN Information:' => (empty($row['NetworkWakeOnLAN']) ? 'N/A' : $row['NetworkWakeOnLAN']), 'Power-Off Sequence Permitted: ' => ($row['BlockPowerOffs'] == 1 ? 'Blocked' : 'Permitted'));
 				$main .= '<h2>System State</h2>' . pts_webui::r2d_array_to_table($info_table, 'auto');
 
 				if(!PHOROMATIC_USER_IS_VIEWER)
@@ -195,13 +200,13 @@ class phoromatic_systems implements pts_webui_interface
 						$mm_onclick = 'return confirm(\'Enter maintenance mode now?\');';
 					}
 
-					$main .= '<p><form action="' . $_SERVER['REQUEST_URI'] . '" name="update_groups" method="post"><input type="hidden" name="maintenance_mode" value="' . $mm_val . '" /><input type="submit" value="' . $mm_str . '" onclick="' . $mm_onclick . '" style="float: left; margin: 0 20px 5px 0;" /></form> Putting the system into maintenance mode will power up the system (if supported and applicable) and cause the Phoronix Test Suite Phoromatic client to idle and block all testing until the mode has been disabled. If a test is already running on the system, the maintenance mode will not be entered until after the testing has completed. The maintenance mode can be used if wishing to update the system software or carry out other tasks without interfering with the Phoromatic client process. Once disabled, the Phoronix Test Suite will continue to function as normal.</p>';
+					$main .= '<p><form action="' . $_SERVER['REQUEST_URI'] . '" name="update_groups" method="post">' . write_token_in_form() . '<input type="hidden" name="maintenance_mode" value="' . $mm_val . '" /><input type="submit" value="' . $mm_str . '" onclick="' . $mm_onclick . '" style="float: left; margin: 0 20px 5px 0;" /></form> Putting the system into maintenance mode will power up the system (if supported and applicable) and cause the Phoronix Test Suite Phoromatic client to idle and block all testing until the mode has been disabled. If a test is already running on the system, the maintenance mode will not be entered until after the testing has completed. The maintenance mode can be used if wishing to update the system software or carry out other tasks without interfering with the Phoromatic client process. Once disabled, the Phoronix Test Suite will continue to function as normal.</p>';
 
 					if($row['CoreVersion'] >= 5730)
 					{
-						$main .= '<p><form action="' . $_SERVER['REQUEST_URI'] . '" name="update_groups" method="post"><input type="hidden" name="tick_thread_reboot" value="1" /><input type="submit" value="Reboot System" style="float: left; margin: 0 20px 5px 0;" /></form> If the system is currently powered up and connected to the Phoromatic Server, this will send a message to the system to issue a reboot -- in case the system is hung on a test or you wish to otherwise manually reboot the server.</p>';
+						$main .= '<p><form action="' . $_SERVER['REQUEST_URI'] . '" name="update_groups" method="post">' . write_token_in_form() . '<input type="hidden" name="tick_thread_reboot" value="1" /><input type="submit" value="Reboot System" style="float: left; margin: 0 20px 5px 0;" /></form> If the system is currently powered up and connected to the Phoromatic Server, this will send a message to the system to issue a reboot -- in case the system is hung on a test or you wish to otherwise manually reboot the server.</p>';
 
-						$main .= '<p><form action="' . $_SERVER['REQUEST_URI'] . '" name="update_groups" method="post"><input type="hidden" name="tick_thread_halt" value="1" /><input type="submit" value="Halt Testing" style="float: left; margin: 0 20px 5px 0;" /></form> If the system is currently powered up and running a test/benchmark via the Phoromatic Server, this will tell the system to halt the testing prematurely as soon as the currently-active test has finished. The results successfully ran will then be uploaded to the Phoromatic Server.</p>';
+						$main .= '<p><form action="' . $_SERVER['REQUEST_URI'] . '" name="update_groups" method="post">' . write_token_in_form() . '<input type="hidden" name="tick_thread_halt" value="1" /><input type="submit" value="Halt Testing" style="float: left; margin: 0 20px 5px 0;" /></form> If the system is currently powered up and running a test/benchmark via the Phoromatic Server, this will tell the system to halt the testing prematurely as soon as the currently-active test has finished. The results successfully ran will then be uploaded to the Phoromatic Server.</p>';
 					}
 				}
 
@@ -211,6 +216,7 @@ class phoromatic_systems implements pts_webui_interface
 
 				$main .= '<form action="' . $_SERVER['REQUEST_URI'] . '" name="update_system_variables" method="post">';
 				$main .= '<table width="80%"><tr><th>Variable Name</th><th>Value</th></tr>';
+				$i = 0;
 				foreach($system_variables as $i => $v_string)
 				{
 					$var = explode('=', $v_string);
@@ -330,7 +336,7 @@ class phoromatic_systems implements pts_webui_interface
 				if(is_file($log_file))
 				{
 					$main .= '<hr /><h2>Phoronix Test Suite Client Log</h2>';
-					$main .= '<p><textarea style="width: 60%; height: 200px;">' . file_get_contents($log_file)  . '</textarea></p>';
+					$main .= '<p><textarea style="width: 100%; height: 300px;">' . file_get_contents($log_file)  . '</textarea></p>';
 					$main .= '<p><em><strong>Last Updated:</strong>' . date ('d F H:i', filemtime($log_file)) . '</em></p>';
 				}
 
@@ -383,7 +389,7 @@ class phoromatic_systems implements pts_webui_interface
 							break;
 						}
 
-						$main .= '<a href="?result/' . $test_result_row['PPRID'] . '"><li>' . $test_result_row['Title'] . '<br /><table><tr><td>' . phoromatic_system_id_to_name($test_result_row['SystemID']) . '</td><td>' . phoromatic_user_friendly_timedate($test_result_row['UploadTime']) .  '</td></tr></table></li></a>';
+						$main .= '<a href="?result/' . $test_result_row['PPRID'] . '"><li>' . $test_result_row['Title'] . '<br /><table><tr><td>' . phoromatic_server::system_id_to_name($test_result_row['SystemID']) . '</td><td>' . phoromatic_server::user_friendly_timedate($test_result_row['UploadTime']) .  '</td></tr></table></li></a>';
 						$results++;
 
 					}
@@ -397,34 +403,82 @@ class phoromatic_systems implements pts_webui_interface
 
 
 				// Any System Errors?
-				$stmt = phoromatic_server::$db->prepare('SELECT ErrorMessage, UploadTime, SystemID, TestIdentifier FROM phoromatic_system_client_errors WHERE AccountID = :account_id AND SystemID = :system_id ORDER BY UploadTime DESC LIMIT 10');
+				$stmt = phoromatic_server::$db->prepare('SELECT ErrorMessage, UploadTime, SystemID, TestIdentifier FROM phoromatic_system_client_errors WHERE AccountID = :account_id AND SystemID = :system_id AND UploadTime >= date("now", "-14 day") ORDER BY UploadTime DESC LIMIT 300');
 				$stmt->bindValue(':account_id', $_SESSION['AccountID']);
 				$stmt->bindValue(':system_id', $PATH[0]);
 				$result = $stmt->execute();
 				$row = $result->fetchArray();
 				if($row != false)
 				{
-					$main .= '<hr /><div class="pts_phoromatic_info_box_area" style="margin: 0 10%;"><ul><li><h1>Recent System Warnings &amp; Errors</h1></li>';
+					$main .= '<hr /><h2>Recent System Warnings &amp; Errors</h2>';
+					$main .= '<div style="overflow: auto; max-height: 500px;">';
+
 					do
 					{
-						$main .= '<a onclick=""><li>' . $row['ErrorMessage'] . '<br /><table><tr><td>' . $row['UploadTime'] . '</td><td>' . $row['TestIdentifier'] . '</td></tr></table></li></a>';
+						$main .= '[' . $row['UploadTime'] . '] <strong>' . $row['TestIdentifier'] . '</strong>: ' .$row['ErrorMessage'] . '<br />';
 					}
 					while($row = $result->fetchArray());
-					$main .= '	</ul></div>';
+					$main .= '</div>';
 					$main .= '<p align="center"><a href="?systems/' . $PATH[0] . '/&clear_system_warnings">Clear System Warnings/Errors</a></p>';
+				}
+
+				$test_install_json = phoromatic_server::phoromatic_account_system_path($_SESSION['AccountID'], $PATH[0]) . 'test-installations.json';
+				if(is_file($test_install_json))
+				{
+					$test_install_json = json_decode(file_get_contents($test_install_json), true);
+					if(!empty($test_install_json))
+					{
+						$main .= '<hr /><h2>Test Profile Installations</h2>';
+						foreach($test_install_json as $test_profile => $ti_data)
+						{
+							$test_installation = new pts_installed_test($ti_data);
+							$status = $test_installation->get_install_status();
+							if($status == 'INSTALLED')
+							{
+								$status = '<span style="color: green;">' . $status . '</span> ' . ($test_installation->get_run_count() > 0 ? '<strong>Times Run:</strong> ' . $test_installation->get_run_count() : '');
+							}
+							else if($status == 'INSTALL_FAILED')
+							{
+								$status = '<span style="color: red; font-weight: bold;">INSTALL FAILED</span>';
+							}
+							$error_output = '';
+							$runtime_errors = $test_installation->get_runtime_errors();
+							$install_errors = $test_installation->get_install_errors();
+							if(!empty($runtime_errors))
+							{
+								foreach($runtime_errors as $e)
+								{
+									$error_output .= '<br />' . trim((empty($e['description']) ? '' : '<em>' . $e['description'] . '</em> - ') . 'Last Attempted: ' . $e['date_time']);
+									foreach($e['errors'] as $error)
+									{
+										$error_output .= '<br /> &nbsp; &nbsp; <span style="color: red; font-weight: bold;">    ' . $error . '</span>';
+									}
+								}
+							}
+							if(!empty($install_errors))
+							{
+								foreach($install_errors as $install_error)
+								{
+									$error_output .= '<br /><span style="color: red; font-weight: bold;">    ' . $install_error . '</span>';
+								}
+							}
+							$main .= '<p><strong>' .  $test_profile . '</strong> ' .  $status . ' (Install Date: ' . $test_installation->get_install_date() . ')' . $error_output . '</p>';
+						}
+					}
 				}
 			}
 		}
 
-
 		if($main == null)
 		{
-			if(!PHOROMATIC_USER_IS_VIEWER && isset($_POST['new_group']) && !empty($_POST['new_group']))
+			if(!PHOROMATIC_USER_IS_VIEWER && isset($_POST['new_group']) && !empty($_POST['new_group']) && verify_submission_token())
 			{
 				$group = trim($_POST['new_group']);
 
 				if($group)
 				{
+					phoromatic_quit_if_invalid_input_found(array('new_group'));
+					$group = pts_strings::simple($group);
 					$stmt = phoromatic_server::$db->prepare('INSERT INTO phoromatic_groups (AccountID, GroupName) VALUES (:account_id, :group_name)');
 					$stmt->bindValue(':account_id', $_SESSION['AccountID']);
 					$stmt->bindValue(':group_name', $group);
@@ -453,7 +507,7 @@ class phoromatic_systems implements pts_webui_interface
 					}
 				}
 			}
-			else if(!PHOROMATIC_USER_IS_VIEWER && isset($_POST['system_group_update']))
+			else if(!PHOROMATIC_USER_IS_VIEWER && isset($_POST['system_group_update']) && verify_submission_token())
 			{
 				$stmt = phoromatic_server::$db->prepare('SELECT SystemID FROM phoromatic_systems WHERE AccountID = :account_id');
 				$stmt->bindValue(':account_id', $_SESSION['AccountID']);
@@ -481,20 +535,21 @@ class phoromatic_systems implements pts_webui_interface
 					}
 				}
 			}
-			else if(!PHOROMATIC_USER_IS_VIEWER && isset($_POST['remove_group']))
+			else if(!PHOROMATIC_USER_IS_VIEWER && isset($_POST['remove_group']) && verify_submission_token())
 			{
+				$remove_group = pts_strings::sanitize($_POST['remove_group']);
 				$stmt = phoromatic_server::$db->prepare('DELETE FROM phoromatic_groups WHERE AccountID = :account_id AND GroupName = :group_name');
 				$stmt->bindValue(':account_id', $_SESSION['AccountID']);
-				$stmt->bindValue(':group_name', $_POST['remove_group']);
+				$stmt->bindValue(':group_name', $remove_group);
 				$stmt->execute();
 				phoromatic_add_activity_stream_event('groups', $group, 'removed');
 
-				$stmt = phoromatic_server::$db->prepare('SELECT SystemID, Groups FROM phoromatic_systems WHERE AccountID = :account_id AND Groups LIKE \'%#' . $_POST['remove_group'] . '#%\'');
+				$stmt = phoromatic_server::$db->prepare('SELECT SystemID, Groups FROM phoromatic_systems WHERE AccountID = :account_id AND Groups LIKE \'%#' . $remove_group . '#%\'');
 				$stmt->bindValue(':account_id', $_SESSION['AccountID']);
 				$result = $stmt->execute();
 				while($row = $result->fetchArray())
 				{
-					$revised_groups = str_replace('#' . $_POST['remove_group'] . '#', '', $row['Groups']);
+					$revised_groups = str_replace('#' . $remove_group . '#', '', $row['Groups']);
 
 					$stmt1 = phoromatic_server::$db->prepare('UPDATE phoromatic_systems SET Groups = :new_groups WHERE AccountID = :account_id AND SystemID = :system_id');
 					$stmt1->bindValue(':account_id', $_SESSION['AccountID']);
@@ -509,7 +564,7 @@ class phoromatic_systems implements pts_webui_interface
 				$stmt = phoromatic_server::$db->prepare('UPDATE phoromatic_systems SET State = :state WHERE AccountID = :account_id AND (julianday() - julianday(LastCommunication)) > :inactive_days_before_removal');
 				$stmt->bindValue(':account_id', $_SESSION['AccountID']);
 				$stmt->bindValue(':state', -1);
-				$stmt->bindValue(':inactive_days_before_removal', $_POST['remove_inactive_systems']);
+				$stmt->bindValue(':inactive_days_before_removal', pts_strings::sanitize($_POST['remove_inactive_systems']));
 				$stmt->execute();
 			}
 
@@ -519,13 +574,14 @@ class phoromatic_systems implements pts_webui_interface
 				$main .= phoromatic_systems_needing_attention();
 				$main .= '<h2>Add A System</h2>
 				<p>To connect a <a href="http://www.phoronix-test-suite.com/">Phoronix Test Suite</a> test system to this account for remotely managing and/or carrying out routine automated benchmarking, follow these simple and quick steps:</p>
-				<ol><li>From a system with <em>Phoronix Test Suite 5.4 or newer</em> run <strong>phoronix-test-suite phoromatic.connect ' . phoromatic_web_socket_server_addr() . '</strong>. (The test system must be able to access this server\'s correct IP address / domain name.)</li><li>When you have run the command from the test system, you will need to log into this page on Phoromatic server again where you can approve the system and configure the system settings so you can begin using it as part of this Phoromatic account.</li><li>Repeat the two steps for as many systems as you would like! When you are all done -- if you haven\'t done so already, you can start creating test schedules, groups, and other Phoromatic events.</li></ol>
+				<p>From a system with Phoronix Test Suite installed, run <strong>phoronix-test-suite phoromatic.connect ' . phoromatic_web_socket_server_addr() . '</strong>. (The test system must be able to access this server\'s correct IP address / domain name.)</p><p>When you have run the command from the test system, you will need to log into this page on Phoromatic server again where you can approve the system and configure the system settings so you can begin using it as part of this Phoromatic account.</p><p>Repeat the two steps for as many systems as you would like. When you are all done -- if you haven\'t done so already, you can start creating test schedules, groups, and other Phoromatic events.</p>
 				<p>Those having to connect many Phoronix Test Suite Phoromatic clients can also attempt <a href="?system_claim">adding the server configuration</a> via SSH or an IP/MAC address claim.</p>
+				<p>The Phoronix Test Suite ships with a <em>phoromatic-client</em> systemd example service file for automatically starting the Phoromatic client process after the initial configuration process is complete.</p>
 				<p><button onclick="javascript:window.location.replace(\'?system_claim\');">Add Via SSH Or IP/MAC Claim</button></p>';
 
 			}
-			$main .= '<hr />
 
+			$main .= '<hr />
 			<h2>Systems</h2>
 			<div class="pts_phoromatic_info_box_area">
 
@@ -546,7 +602,7 @@ class phoromatic_systems implements pts_webui_interface
 					{
 						do
 						{
-							$acti = phoromatic_compute_estimated_time_remaining_string($row['EstimatedTimeForTask'], $row['LastCommunication']) . ($row['TaskPercentComplete'] > 0 ? ' [' . $row['TaskPercentComplete'] . '% Complete]' : null);
+							$acti = phoromatic_server::estimated_time_remaining_string($row['EstimatedTimeForTask'], $row['LastCommunication']) . ($row['TaskPercentComplete'] > 0 ? ' [' . $row['TaskPercentComplete'] . '% Complete]' : null);
 							if(empty($acti))
 							{
 								$next_job_in = phoromatic_server::time_to_next_scheduled_job($_SESSION['AccountID'], $row['SystemID']);
@@ -592,7 +648,6 @@ class phoromatic_systems implements pts_webui_interface
 				$main .= '</ul>';
 			}
 
-
 			$main .= '</div>';
 
 			if(!PHOROMATIC_USER_IS_VIEWER)
@@ -602,7 +657,7 @@ class phoromatic_systems implements pts_webui_interface
 				<p>System groups make it very easy to organize multiple test systems for targeting by test schedules. You can always add/remove systems to groups, create new groups, and add systems to multiple groups. After creating a group and adding systems to the group, you can begin targeting tests against a particular group of systems. Systems can always be added/removed from groups later and a system can belong to multiple groups.</p>';
 
 
-				$main .= '<div style="float: left;"><form name="new_group_form" id="new_group_form" action="?systems" method="post" onsubmit="return phoromatic_new_group(this);">
+				$main .= '<div style="float: left;"><form name="new_group_form" id="new_group_form" action="?systems" method="post" onsubmit="return phoromatic_new_group(this);">' . write_token_in_form() . '
 				<p><div style="width: 200px; font-weight: bold; float: left;">New Group Name:</div> <input type="text" style="width: 300px;" name="new_group" value="" /></p>
 				<p><div style="width: 200px; font-weight: bold; float: left;">Select System(s) To Add To Group:</div><select name="systems_for_group[]" multiple="multiple" style="width: 300px;">';
 
@@ -648,7 +703,7 @@ class phoromatic_systems implements pts_webui_interface
 
 					$main .= '</div>';
 
-					$main .= '<hr /><a name="group_edit"></a><h2>System Group Editing</h2><div style="text-align: center;"><form action="' . $_SERVER['REQUEST_URI'] . '" name="update_groups" method="post"><input type="hidden" name="system_group_update"  value="1" />';
+					$main .= '<hr /><a name="group_edit"></a><h2>System Group Editing</h2><div style="text-align: center;"><form action="' . $_SERVER['REQUEST_URI'] . '" name="update_groups" method="post">' . write_token_in_form() . '<input type="hidden" name="system_group_update"  value="1" />';
 					$main .= '<table style="margin: 5px auto; overflow: auto;">';
 					$main .= '<tr>';
 					$main .= '<th></th>';
@@ -683,19 +738,15 @@ class phoromatic_systems implements pts_webui_interface
 					}
 
 					$main .= '</table><p><input name="submit" value="Update Groups" type="submit" /></p></form></div>';
-
 					$main .= '<hr /><h2>Remove A Group</h2><p>Removing a group is a permanent action that cannot be undone.</p>';
-
-					$main .= '<p><form action="' . $_SERVER['REQUEST_URI'] . '" name="remove_group" method="post"><select name="remove_group" id="remove_group">';
+					$main .= '<p><form action="' . $_SERVER['REQUEST_URI'] . '" name="remove_group" method="post">' . write_token_in_form() . '<select name="remove_group" id="remove_group">';
 
 					foreach($all_groups as $group)
 					{
 						$main .= '<option value="' . $group . '">' . $group . '</option>';
 					}
 					$main .= '</select> <input name="submit" value="Remove Group" type="submit" /></form></p>';
-
 					$main .= '<hr /><h2>Retire Inactive Systems</h2><p>This option will soft-delete systems that have not communicated with this Phoromatic Server in more than one week (7 days).</p>';
-
 					$main .= '<p><form action="' . $_SERVER['REQUEST_URI'] . '" name="remove_inactive" method="post"><input type="hidden" name="remove_inactive_systems" value="7" /><input name="submit" value="Remove Inactive Systems" type="submit" /></form></p>';
 				}
 			}

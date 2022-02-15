@@ -3,8 +3,8 @@
 /*
 	Phoronix Test Suite
 	URLs: http://www.phoronix.com, http://www.phoronix-test-suite.com/
-	Copyright (C) 2010 - 2021, Phoronix Media
-	Copyright (C) 2010 - 2021, Michael Larabel
+	Copyright (C) 2010 - 2022, Phoronix Media
+	Copyright (C) 2010 - 2022, Michael Larabel
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,30 +24,98 @@ class pts_result_file_output
 {
 	public static function result_file_to_json(&$result_file)
 	{
+		// XXX interface should be fairly stable now subject to any additions...
 		$json = array();
 		$json['title'] = $result_file->get_title();
+		$json['last_modified'] = $result_file->get_last_modified();
+		$json['description'] = $result_file->get_description();
+		$json['notes'] = $result_file->get_notes();
+		$json['internal_tags'] = $result_file->get_internal_tags();
+		$json['reference_id'] = $result_file->get_reference_id();
+		$json['preset_environment_variables'] = $result_file->get_preset_environment_variables();
+		$json = array_filter($json);
+
+		$json['systems'] = array();
+		foreach($result_file->get_systems() as $s)
+		{
+			$system = array(
+				'identifier' => $s->get_identifier(),
+				'hardware' => pts_result_file_analyzer::system_component_string_to_array($s->get_hardware()),
+				'software' => pts_result_file_analyzer::system_component_string_to_array($s->get_software()),
+				'user' => $s->get_username(),
+				'timestamp' => $s->get_timestamp(),
+				'client_version' => $s->get_client_version(),
+				'notes' => $s->get_notes(),
+				'data' => $s->get_json(),
+				);
+			$json['systems'][$s->get_identifier()] = array_filter($system);
+		}
 
 		$json['results'] = array();
 		foreach($result_file->get_result_objects() as $result_object)
 		{
 			$r = array(
-				'test' => $result_object->test_profile->get_identifier(),
-				'arguments' => $result_object->get_arguments_description(),
-				'units' => $result_object->test_profile->get_result_scale(),
+				'identifier' => $result_object->test_profile->get_identifier(),
+				'title' => $result_object->test_profile->get_title(),
+				'app_version' => $result_object->test_profile->get_app_version(),
+				'arguments' => $result_object->get_arguments(),
+				'description' => $result_object->get_arguments_description(),
+				'scale' => $result_object->test_profile->get_result_scale(),
+				'proportion' => $result_object->test_profile->get_result_proportion(),
+				'display_format' => $result_object->test_profile->get_display_format(),
+				'annotation' => $result_object->get_annotation(),
+				'parent' => $result_object->get_parent_hash()
 				);
 
 			foreach($result_object->test_result_buffer as &$buffers)
 			{
 				foreach($buffers as &$buffer)
 				{
-					$r['results'][$buffer->get_result_identifier()] = array(
+					$b = array(
 						'value' => $buffer->get_result_value(),
-						'all_results' => $buffer->get_result_raw()
+						'raw_values' => $buffer->get_result_raw_array(),
+						'details' => $buffer->get_result_json(),
 						);
+
+					foreach(array('min-result' => 'min_result', 'max-result' => 'max_result') as $f => $t)
+					{
+						if(isset($b['details'][$f]))
+						{
+							$b[$t] = explode(':', $b['details'][$f]);
+							unset($b['details'][$f]);
+						}
+					}
+					if(is_numeric($b['value']))
+					{
+						$b['value'] = (float)$b['value'];
+					}
+					foreach($b['raw_values'] as &$v)
+					{
+						$v = (float)$v;
+					}
+					if(isset($b['details']['test-run-times']))
+					{
+						$b['test_run_times'] = explode(':', $b['details']['test-run-times']);
+						foreach($b['test_run_times'] as &$v)
+						{
+							$v = (float)$v;
+						}
+						unset($b['details']['test-run-times']);
+					}
+
+					if(!empty($b['details']))
+					{
+						// Move to end of array...
+						$details = $b['details'];
+						unset($b['details']);
+						$b['details'] = $details;
+					}
+
+					$r['results'][$buffer->get_result_identifier()] = array_filter($b);
 				}
 			}
 
-			$json['results'][] = $r;
+			$json['results'][$result_object->get_comparison_hash(true, false)] = array_filter($r);
 		}
 
 		return json_encode($json, JSON_PRETTY_PRINT);
@@ -795,6 +863,65 @@ class pts_result_file_output
 
 		return $html;
 	}
+	public static function result_file_to_html(&$result_file, $extra_attributes = null, $referral_url = '')
+	{
+		$html = '<html><head><title>' . $result_file->get_title() . ' - Phoronix Test Suite</title></head><body>';
+		$html .= '<h1>' . $result_file->get_title() . '</h1>';
+		$html .= '<p>' . $result_file->get_description() . '</p>';
+
+		if($referral_url != '')
+		{
+			$html .= '<p>HTML result view exported from: <a href="' . $referral_url . '">' . $referral_url . '</a>.</p>';
+		}
+
+		$table = new pts_ResultFileSystemsTable($result_file);
+		$html .= '<p style="text-align: center; overflow: auto;">' . pts_render::render_graph_inline_embed($table, $result_file, $extra_attributes, true, 'SVG') . '</p>';
+
+		$intent = null;
+		$table = new pts_ResultFileTable($result_file, $intent);
+		$html .= '<p style="text-align: center; overflow: auto;">' . pts_render::render_graph_inline_embed($table, $result_file, $extra_attributes, true, 'SVG') . '</p>';
+
+		// The Results
+		foreach($result_file->get_result_objects() as $result_object)
+		{
+			$res = pts_render::render_graph_inline_embed($result_object, $result_file, $extra_attributes, true, 'SVG');
+
+			if($res == false)
+			{
+				continue;
+			}
+
+			$html .= '<h2>' . $result_object->test_profile->get_title() . '</h2>';
+			$html .= '<h3>' . $result_object->get_arguments_description() . '</h3>';
+			$html .= '<p align="center">';
+			$html .= $res;
+			$html .= '</p>';
+
+			if($result_object->get_annotation() == null)
+			{
+				$html .= '<p align="center">' . $result_object->get_annotation() . '</p>';
+			}
+			foreach($result_object->test_result_buffer->buffer_items as &$bi)
+			{
+				if($bi->get_result_value() == null)
+				{
+					$bi_error = $bi->get_error();
+					if($bi_error == null)
+					{
+						$bi_error = 'Test failed to run.';
+					}
+					$html .= '<p align="center"><strong>' . $bi->get_result_identifier() . ':</strong> ' . strip_tags($bi_error) . '</p>';
+				}
+			}
+			unset($result_object);
+		}
+
+		// Footer
+		$html .= '<hr /><p align="center">' . pts_core::program_title() . '</p>';
+		$html .= '</body></html>';
+
+		return $html;
+	}
 	public static function result_file_to_pdf(&$result_file, $dest, $output_name, $extra_attributes = null)
 	{
 		//ini_set('memory_limit', '1024M');
@@ -1046,10 +1173,6 @@ class pts_result_file_output
 				$last_result_title = $result_object->test_profile->get_title();
 				$pdf->CreateBookmark($last_result_title, 0);
 			}
-			if($system_count > 2)
-			{
-				$result_object->sort_results_by_performance();
-			}
 			$graph = pts_render::render_graph_process($result_object, $result_file, false, $extra_attributes);
 			self::add_graph_result_object_to_pdf($pdf, $graph);
 			if($result_object->get_annotation() != null)
@@ -1079,7 +1202,7 @@ class pts_result_file_output
 
 		$pdf->WriteText('This file was automatically generated via the Phoronix Test Suite benchmarking software on ' . date('l, j F Y H:i') . '.', 'I');
 		ob_get_clean();
-		$pdf->Output($dest, $output_name);
+		return $pdf->Output($dest, $output_name);
 	}
 	protected static function add_graph_result_object_to_pdf(&$pdf, &$graph)
 	{
@@ -1098,6 +1221,269 @@ class pts_result_file_output
 		//$pdf->Ln(1);
 		$pdf->Image($tmp_file);
 		unlink($tmp_file);
+	}
+	public static function text_box_plut_from_ae(&$ae_data, $active_result = -1, $results_to_show = array(), &$result_object = false, $percentiles = null, $sample_count = -1)
+	{
+		if($percentiles == null)
+		{
+			$percentiles = isset($ae_data['percentiles']) ? $ae_data['percentiles'] : array();
+		}
+		if(empty($percentiles))
+		{
+			return false;
+		}
+		if($sample_count == -1)
+		{
+			$sample_count = $ae_data['samples'];
+		}
+
+		$terminal_width = pts_client::terminal_width();
+		$box_plot = str_repeat(' ', $terminal_width - 4);
+		$box_plot_size = strlen($box_plot);
+		$box_plot = str_split($box_plot);
+		$max_value = max(max($percentiles), $active_result);
+		$hib = $ae_data['hib'] == 1 && (!isset($ae_data['unit']) || strtolower($ae_data['unit']) != 'seconds');
+		if($hib)
+		{
+			$max_value = $max_value * 1.02;
+		}
+		$results_at_pos = array(0, 1, ($box_plot_size - 1));
+
+		// BOX PLOT
+		$whisker_bottom = $percentiles[2];
+		$whisker_top = $percentiles[98];
+		$whisker_start_char = round($whisker_bottom / $max_value * $box_plot_size);
+		$whisker_end_char = round($whisker_top / $max_value * $box_plot_size);
+
+		for($i = $whisker_start_char; $i <= $whisker_end_char && $i < ($box_plot_size - 1); $i++)
+		{
+			$box_plot[$i] = '-';
+		}
+
+		$box_left = floor(($percentiles[25] / $max_value) * $box_plot_size);
+		$box_middle = round(($percentiles[50] / $max_value) * $box_plot_size);
+		$box_right = ceil(($percentiles[75] / $max_value) * $box_plot_size);
+		for($i = $box_left; $i <= $box_right; $i++)
+		{
+			$box_plot[$i] = '#';
+		}
+		$box_plot[$whisker_start_char] = '|';
+		$box_plot[min($whisker_end_char, ($box_plot_size - 1))] = '|';
+		$box_plot[$box_middle] = '!';
+
+		// END OF BOX PLOT
+		if(!$hib)
+		{
+			$box_plot = array_reverse($box_plot);
+		}
+		$box_plot[0] = '[';
+		$box_plot[($box_plot_size - 1)] = ']';
+
+		if($active_result < $max_value)
+		{
+			$box_plot_complement = array();
+			for($i = 0; $i < 6; $i++)
+			{
+				$box_plot_complement[$i] = str_repeat(' ', $terminal_width - 4);
+				$box_plot_complement[$i] = str_split($box_plot_complement[$i]);
+			}
+
+			$reference_results_added = 0;
+			if(isset($ae_data['reference_results']) && is_array($ae_data['reference_results']))
+			{
+				$st = phodevi_base::determine_system_type(phodevi::system_hardware(), phodevi::system_software());
+				foreach($ae_data['reference_results'] as $component => $value)
+				{
+					$this_type = phodevi_base::determine_system_type($component, $component);
+					if($this_type == $st)
+					{
+						$results_to_show[$component] = $value;
+						unset($ae_data['reference_results'][$component]);
+					}
+				}
+				foreach($ae_data['reference_results'] as $component => $value)
+				{
+					$results_to_show[$component] = $value;
+				}
+			}
+			else if(empty($results_to_show))
+			{
+				// Show some common percentile marks for some perspective
+				foreach(array(10, 25, 60, 75, 90) as $p_to_show)
+				{
+					$value = $percentiles[($hib ? $p_to_show : 100 - $p_to_show)];
+					if($value > 60)
+					{
+						$value = round($percentiles[($hib ? $p_to_show : 100 - $p_to_show)]);
+					}
+					$results_to_show[pts_strings::number_suffix_handler($p_to_show) . ' Percentile'] = $value;
+				}
+			}
+
+			if($active_result > 0)
+			{
+				$this_result_percentile = -1;
+				foreach($percentiles as $percentile => $v)
+				{
+					if(!$hib)
+					{
+						if($v > $active_result)
+						{
+							$this_result_percentile = 100 - $percentile ;
+							break;
+						}
+					}
+					else if($v > $active_result)
+					{
+						$this_result_percentile = $percentile - 1;
+						break;
+					}
+				}
+				$results_to_show = array_merge(array('This Result' . ($this_result_percentile > 0 && $this_result_percentile < 100 ? ' (' . pts_strings::number_suffix_handler($this_result_percentile) . ' Percentile)' : '') => ($active_result > 99 ? round($active_result) : $active_result)), $results_to_show);
+			}
+			foreach($results_to_show as $component => $value)
+			{
+				if($value > $max_value)
+				{
+					continue;
+				}
+				$this_result_pos = round($value / $max_value * $box_plot_size);
+				if(in_array($this_result_pos, $results_at_pos) || (strpos($component, 'This Result') === false && !in_array((isset($box_plot[$this_result_pos]) ? $box_plot[$this_result_pos] : null), array(' ', '-', '#'))))
+				{
+					continue;
+				}
+
+				$skip_result = false;
+				foreach(array(' Sample', 'Confidential') as $avoid_strings)
+				{
+					// Extra protection
+					if(stripos($component, $avoid_strings) !== false)
+					{
+						$skip_result = true;
+						break;
+					}
+				}
+				if($skip_result)
+				{
+					continue;
+				}
+
+				// Blocks other entries from overwriting or being immediately adjacent to one another
+				$results_at_pos[] = $this_result_pos;
+				$results_at_pos[] = $this_result_pos - 1;
+				$results_at_pos[] = $this_result_pos + 1;
+
+				if($terminal_width <= 80)
+				{
+					// Try to shorten up some components/identifiers if terminal narrow to fit in more data
+					$component = str_replace(array('AMD ', 'Intel ', 'NVIDIA ', 'Radeon ', 'GeForce ', '  '), ' ', str_replace(' x ', ' x  ', $component));
+					$component = str_replace('Ryzen Threadripper', 'Threadripper', $component);
+					$component = trim($component);
+				}
+
+				foreach(array('-Core', ' with ') as $cutoff)
+				{
+					// On AMD product strings, trip the XX-Core from string to save space...
+					// Similarly some "APU with Radeon" text also chop off
+					if(($cc = strpos($component, $cutoff)) !== false)
+					{
+						$component = substr($component, 0, $cc);
+						$component = substr($component, 0, strrpos($component, ' '));
+					}
+				}
+
+				if(empty($component))
+				{
+					continue;
+				}
+
+				if(!$hib)
+				{
+					$this_result_pos = $box_plot_size - $this_result_pos;
+				}
+
+				$string_to_show_length = strlen('^ ' . $component . ': ' . $value);
+				if($this_result_pos - $string_to_show_length - 3 > 4)
+				{
+					// print to left
+					$string_to_print = $component . ': ' . $value . ' ^';
+					$write_pos = ($this_result_pos - strlen($string_to_print) + 1);
+				}
+				else if($this_result_pos + $string_to_show_length < ($terminal_width - 3))
+				{
+					// print to right of line
+					$string_to_print = '^ ' . $component . ': ' . $value;
+					$write_pos = $this_result_pos;
+				}
+				else
+				{
+					continue;
+				}
+
+				// validate no overwrites
+				$complement_line = ($reference_results_added % 5);
+				if($complement_line == 0 && strpos($component, 'This Result') === false)
+				{
+					$complement_line = 1;
+				}
+				$no_overwrites = true;
+				for($i = $write_pos; $i < ($write_pos + $string_to_show_length) + 1 && isset($box_plot_complement[$complement_line][$i]); $i++)
+				{
+					if($box_plot_complement[$complement_line][$i] != ' ')
+					{
+						$no_overwrites = false;
+						break;
+					}
+				}
+				if($no_overwrites == false)
+				{
+					continue;
+				}
+				// end
+
+				$brand_color = null;
+				if(strpos($component, 'This Result') !== false)
+				{
+					$brand_color = 'cyan';
+					$string_to_print = pts_client::cli_colored_text($string_to_print, 'cyan', true);
+					$box_plot[$this_result_pos] = pts_client::cli_colored_text('X', 'cyan', true);
+				}
+				else if($result_object && in_array($component, $result_object->test_result_buffer->get_identifiers()))
+				{
+					$string_to_print = pts_client::cli_colored_text($string_to_print, 'white', true);
+				}
+				else if(($brand_color = pts_render::identifier_to_brand_color($component, null)) != null)
+				{
+					$brand_color = pts_client::hex_color_to_string($brand_color);
+					$string_to_print = pts_client::cli_colored_text($string_to_print, $brand_color, false);
+				}
+				for($i = $write_pos; $i < ($write_pos + $string_to_show_length) && $i < count($box_plot_complement[$complement_line]); $i++)
+				{
+					$box_plot_complement[$complement_line][$i] = '';
+				}
+				$box_plot_complement[$complement_line][$write_pos] = $string_to_print;
+				$box_plot[$this_result_pos] = pts_client::cli_colored_text('*', $brand_color, false);
+				$reference_results_added++;
+			}
+
+			$last_appeared_text = '';
+			if(isset($ae_data['last_appeared']) && $ae_data['last_appeared'] > 0 && $ae_data['last_appeared'] < (time() - (86400 * 30)))
+			{
+				$last_appeared_text = ' to ' . pts_client::cli_just_bold(date(($ae_data['last_appeared'] > (time() - (86400 * 270)) ? 'j F' : 'j F Y'), $ae_data['last_appeared']));
+			}
+
+			echo PHP_EOL;
+			echo '    Comparison of ' . pts_client::cli_just_bold(number_format($sample_count)) . ' OpenBenchmarking.org samples' . ($ae_data['first_appeared'] < 1298678400 ? '' : ' since ' . pts_client::cli_just_bold(date(($ae_data['first_appeared'] > (time() - (86400 * 270)) ? 'j F' : 'j F Y'), $ae_data['first_appeared'])) . $last_appeared_text) . '; median result: ' . pts_client::cli_just_bold(round($percentiles[50], ($percentiles[50] < 100 ? 2 : 0)) . (isset($ae_data['unit']) && !empty($ae_data['unit']) ? ' ' . $ae_data['unit'] : '')) . '. Box plot of samples:' . PHP_EOL;
+			echo '    ' . implode('', $box_plot) . PHP_EOL;
+			foreach($box_plot_complement as $line_r)
+			{
+				$line = rtrim(implode('', $line_r));
+				if(!empty($line))
+				{
+					echo '    ' . $line . PHP_EOL;
+				}
+			}
+		}
 	}
 }
 

@@ -3,8 +3,8 @@
 /*
 	Phoronix Test Suite
 	URLs: http://www.phoronix.com, http://www.phoronix-test-suite.com/
-	Copyright (C) 2008 - 2021, Phoronix Media
-	Copyright (C) 2008 - 2021, Michael Larabel
+	Copyright (C) 2008 - 2022, Phoronix Media
+	Copyright (C) 2008 - 2022, Michael Larabel
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -33,18 +33,62 @@ class pts_tests
 	{
 		self::$extra_env_vars = array();
 	}
-	public static function installed_tests()
+	public static function remove_installed_test(&$test_profile)
 	{
-		$cleaned_tests = array();
+		pts_file_io::delete($test_profile->get_install_dir(), array('pts-install.json'), true);
+
+		if($test_profile->test_installation)
+		{
+			$test_profile->test_installation->set_install_status('REMOVED');
+			$test_profile->test_installation->save_test_install_metadata();
+		}
+	}
+	public static function tests_installations_with_metadata()
+	{
+		$tests = array();
 		$repo = '*';
 		$install_root_path = pts_client::test_install_root_path();
 		$install_root_path_length = strlen($install_root_path);
-		foreach(pts_file_io::glob($install_root_path . $repo . '/*/pts-install.xml') as $identifier_path)
+		foreach(pts_file_io::glob($install_root_path . $repo . '/*/pts-install.json') as $identifier_path)
 		{
-			$cleaned_tests[] = substr(dirname($identifier_path), $install_root_path_length);
+			$test_identifier = substr(dirname($identifier_path), $install_root_path_length);
+			$tests[] = new pts_test_profile($test_identifier);
+		}
+
+		return $tests;
+	}
+	public static function installed_tests($return_objects = false)
+	{
+		$cleaned_tests = array();
+		foreach(pts_tests::tests_installations_with_metadata() as $test_profile)
+		{
+			if($test_profile->test_installation && $test_profile->test_installation->is_installed())
+			{
+				if($return_objects)
+				{
+					$cleaned_tests[] = $test_profile;
+				}
+				else
+				{
+					$cleaned_tests[] = $test_profile->get_identifier();
+				}
+			}
 		}
 
 		return $cleaned_tests;
+	}
+	public static function tests_failed_install()
+	{
+		$failed_tests = array();
+		foreach(pts_tests::tests_installations_with_metadata() as $test_profile)
+		{
+			if($test_profile->test_installation && $test_profile->test_installation->get_install_status() == 'INSTALL_FAILED')
+			{
+				$failed_tests[] = $test_profile;
+			}
+		}
+
+		return $failed_tests;
 	}
 	public static function partially_installed_tests()
 	{
@@ -73,7 +117,12 @@ class pts_tests
 	{
 		$error = null;
 
-		foreach(array('fatal error', 'error while loading', 'undefined reference', 'cannot find -l', 'error:', 'returned 1 exit status', 'not found', 'child process excited with status', 'error opening archive', 'failed to load', 'fatal', 'illegal argument', 'is required to build', 'or higher is required', ': No such file or directory') as $error_string)
+		if(empty($log_file))
+		{
+			return $error;
+		}
+
+		foreach(array('fatal error', 'error while loading', 'undefined reference', 'cannot find -l', 'error:', 'returned 1 exit status', 'not found', 'child process excited with status', 'error opening archive', 'failed to load', 'fatal', 'illegal argument', 'is required to build', 'or higher is required', ': No such file or directory', 'not enough slots', 'mpirun noticed that process', 'permission denied', 'connection refused', 'MPI_ABORT was invoked', 'mpirun was unable to launch', 'error adding symbols:') as $error_string)
 		{
 			$lf = $log_file;
 			if(($e = strripos($lf, $error_string)) !== false)
@@ -95,7 +144,7 @@ class pts_tests
 					continue;
 				}
 
-				if(isset($lf[8]) && !isset($lf[144]) && strpos($lf, PHP_EOL) === false)
+				if(isset($lf[8]) && !isset($lf[255]) && strpos($lf, PHP_EOL) === false)
 				{
 					$error = $lf;
 					break;
@@ -118,7 +167,7 @@ class pts_tests
 		{
 			// See if the last line of the log is e.g. 'No OpenCL Environment Found', 'FFFFF Not Found', Etc
 			$last_line = trim(substr($log_file, $s));
-			if(isset($last_line[8]) && !isset($last_line[144]))
+			if(isset($last_line[8]) && !isset($last_line[255]))
 			{
 				$error = $last_line;
 			}
@@ -232,7 +281,7 @@ class pts_tests
 
 		return $reverse_dep_look_for_files;
 	}
-	public static function extra_environmental_variables(&$test_profile)
+	public static function extra_environment_variables(&$test_profile)
 	{
 		$extra_vars = array();
 
@@ -278,7 +327,7 @@ class pts_tests
 	}
 	public static function call_test_script($test_profile, $script_name, $print_string = null, $pass_argument = null, $extra_vars_append = null, $use_ctp = true, $no_prompts = false)
 	{
-		$extra_vars = pts_tests::extra_environmental_variables($test_profile);
+		$extra_vars = pts_tests::extra_environment_variables($test_profile);
 
 		if(isset($extra_vars_append['PATH']))
 		{
@@ -303,11 +352,9 @@ class pts_tests
 			$test_profiles = array_merge($test_profiles, $test_profile->extended_test_profiles());
 		}
 
-		$use_phoroscript = phodevi::is_windows();
 		if(phodevi::is_windows() && is_executable('C:\cygwin64\bin\bash.exe'))
 		{
 			$sh = 'C:\cygwin64\bin\bash.exe';
-			$use_phoroscript = false;
 			$extra_vars['PATH'] = $extra_vars['PATH'] . ';C:\cygwin64\bin';
 		}
 		else if(pts_client::executable_in_path('bash'))
@@ -338,19 +385,12 @@ class pts_tests
 				// if override_test_script_execution_handler returned -1, fallback to using normal script handler
 				if(!isset($this_result) || $this_result == '-1')
 				{
-					if($use_phoroscript || pts_client::read_env('USE_PHOROSCRIPT_INTERPRETER') != false)
-					{
-						echo PHP_EOL . 'Falling back to experimental PhoroScript code path...' . PHP_EOL;
-						$phoroscript = new pts_phoroscript_interpreter($run_file, $extra_vars, $test_directory);
-						$phoroscript->execute_script($pass_argument);
-						$this_result = null;
-					}
-					else if(phodevi::is_windows())
+					if(phodevi::is_windows())
 					{
 						$host_env = $_SERVER;
 						unset($host_env['argv']);
 						$descriptorspec = array(0 => array('pipe', 'r'), 1 => array('pipe', 'w'), 2 => array('pipe', 'w'));
-						$test_process = proc_open($sh . ' "' . $run_file . '" ' . $pass_argument . (phodevi::is_windows() && false ? '' : ' 2>&1'), $descriptorspec, $pipes, $test_directory, array_merge($host_env, pts_client::environmental_variables(), $extra_vars));
+						$test_process = proc_open($sh . ' "' . $run_file . '" ' . $pass_argument . (phodevi::is_windows() && false ? '' : ' 2>&1'), $descriptorspec, $pipes, $test_directory, array_merge($host_env, pts_client::environment_variables(), $extra_vars));
 
 						if(is_resource($test_process))
 						{

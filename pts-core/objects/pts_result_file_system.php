@@ -222,6 +222,10 @@ class pts_result_file_system
 				if($res === true)
 				{
 					$possible_log_paths = array('system-logs/' . $this->get_identifier() . '/');
+					if($this->get_identifier() != ($simplified = pts_strings::simplify_string_for_file_handling($this->get_identifier())))
+					{
+						$possible_log_paths[] = 'system-logs/' . $simplified . '/';
+					}
 
 					if($this->get_identifier() != $this->get_original_identifier())
 					{
@@ -251,7 +255,6 @@ class pts_result_file_system
 									}
 									$files[] = $basename_file;
 								}
-
 							}
 						}
 

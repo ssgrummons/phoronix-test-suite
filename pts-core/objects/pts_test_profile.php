@@ -3,8 +3,8 @@
 /*
 	Phoronix Test Suite
 	URLs: http://www.phoronix.com, http://www.phoronix-test-suite.com/
-	Copyright (C) 2008 - 2021, Phoronix Media
-	Copyright (C) 2008 - 2021, Michael Larabel
+	Copyright (C) 2008 - 2022, Phoronix Media
+	Copyright (C) 2008 - 2022, Michael Larabel
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
 class pts_test_profile extends pts_test_profile_parser
 {
 	public $test_installation = false;
+	protected $overview = false;
 	protected static $test_installation_cache;
 
 	public function __construct($identifier = null, $override_values = null, $normal_init = true)
@@ -61,6 +62,47 @@ class pts_test_profile extends pts_test_profile_parser
 	public function get_resource_dir()
 	{
 		return PTS_TEST_PROFILE_PATH . $this->identifier . '/';
+	}
+	public function get_changelog()
+	{
+		$change_log = array();
+		if(is_file($this->get_resource_dir() . 'changelog.json'))
+		{
+			// Archived locally
+			$json_file = pts_file_io::file_get_contents($this->get_resource_dir() . 'changelog.json');
+			$change_log = json_decode($json_file, true);
+		}
+		else if(PTS_IS_CLIENT && stripos($this->get_identifier(), 'local/') === false)
+		{
+			// Query from OB
+			$changelog_query = pts_openbenchmarking_client::fetch_repository_test_profile_changelog($this->get_identifier(false));
+
+			if(is_array($changelog_query) && isset($changelog_query['tests'][$this->get_identifier_base_name()]['changes']))
+			{
+				$change_log = $changelog_query['tests'][$this->get_identifier_base_name()]['changes'];
+			}
+		}
+
+		return $change_log;
+	}
+	public function get_generated_data($ch = false)
+	{
+		if($this->overview === false)
+		{
+			// Cache the parsed JSON if available
+			$this->overview = array();
+			if(is_file($this->get_resource_dir() . 'generated.json'))
+			{
+				$this->overview = json_decode(pts_file_io::file_get_contents($this->get_resource_dir() . 'generated.json'), true);
+			}
+		}
+
+		if($ch != false)
+		{
+			return isset($this->overview['overview'][$ch]) ? $this->overview['overview'][$ch] : false;
+		}
+
+		return $this->overview;
 	}
 	public function get_override_values($as_string = false)
 	{
@@ -172,31 +214,31 @@ class pts_test_profile extends pts_test_profile_parser
 			return $times_to_run;
 		}
 
-		if(($force_runs_multiple = pts_client::read_env('FORCE_TIMES_TO_RUN_MULTIPLE')) && is_numeric($force_runs_multiple) && $force_runs_multiple > 1 && $this->get_estimated_run_time() < (60 * 60 * 2))
+		if(($force_runs_multiple = pts_env::read('FORCE_TIMES_TO_RUN_MULTIPLE')) && is_numeric($force_runs_multiple) && $force_runs_multiple > 1 && $this->get_estimated_run_time() < (60 * 60 * 2))
 		{
 			$times_to_run *= $force_runs_multiple;
 		}
 
-		if(($force_runs = pts_client::read_env('FORCE_TIMES_TO_RUN')) && is_numeric($force_runs))
+		if(($force_runs = pts_env::read('FORCE_TIMES_TO_RUN')) && is_numeric($force_runs) && $force_runs > 0)
 		{
 			$times_to_run = $force_runs;
 		}
 
-		if(($force_min_cutoff = pts_client::read_env('FORCE_MIN_TIMES_TO_RUN_CUTOFF')) == false || ($this->get_estimated_run_time() > 0 && ($this->get_estimated_run_time() / 60) < $force_min_cutoff))
+		if(($force_min_cutoff = pts_env::read('FORCE_MIN_TIMES_TO_RUN_CUTOFF')) == false || ($this->get_estimated_run_time() > 0 && ($this->get_estimated_run_time() / 60) < $force_min_cutoff))
 		{
-			if(($force_runs = pts_client::read_env('FORCE_MIN_TIMES_TO_RUN')) && is_numeric($force_runs) && $force_runs > $times_to_run)
+			if(($force_runs = pts_env::read('FORCE_MIN_TIMES_TO_RUN')) && is_numeric($force_runs) && $force_runs > $times_to_run)
 			{
 				$times_to_run = $force_runs;
 			}
 		}
 
-		if(($force_runs = pts_client::read_env('FORCE_ABSOLUTE_MIN_TIMES_TO_RUN')) && is_numeric($force_runs) && $force_runs > $times_to_run)
+		if(($force_runs = pts_env::read('FORCE_ABSOLUTE_MIN_TIMES_TO_RUN')) && is_numeric($force_runs) && $force_runs > $times_to_run)
 		{
 			$times_to_run = $force_runs;
 		}
 
 		$display_format = $this->get_display_format();
-		if($times_to_run < 1 || ($display_format != null && strlen($display_format) > 6 && substr($display_format, 0, 6) == 'MULTI_' || substr($display_format, 0, 6) == 'IMAGE_'))
+		if($times_to_run < 1 || ($display_format != null && strlen($display_format) > 6 && (substr($display_format, 0, 6) == 'MULTI_' || substr($display_format, 0, 6) == 'IMAGE_')))
 		{
 			// Currently tests that output multiple results in one run can only be run once
 			$times_to_run = 1;
@@ -248,46 +290,51 @@ class pts_test_profile extends pts_test_profile_parser
 
 		return ceil($est_install_time);
 	}
-	public function is_supported($report_warnings = true)
+	public function is_supported($print_warnings = true, &$error = null)
 	{
 		$test_supported = true;
 
-		if(PTS_IS_CLIENT && pts_client::read_env('SKIP_TEST_SUPPORT_CHECKS'))
+		if(PTS_IS_CLIENT && pts_env::read('SKIP_TEST_SUPPORT_CHECKS'))
 		{
 			// set SKIP_TEST_SUPPORT_CHECKS=1 environment variable for debugging purposes to run tests on unsupported platforms
 			return true;
 		}
 		else if($this->is_test_architecture_supported() == false)
 		{
-			PTS_IS_CLIENT && $report_warnings && pts_client::$display->test_run_error($this->get_identifier() . ' is not supported on this architecture: ' . phodevi::read_property('system', 'kernel-architecture'));
+			$error = $this->get_identifier() . ' is not supported on this architecture: ' . phodevi::read_property('system', 'kernel-architecture');
 			$test_supported = false;
 		}
 		else if($this->is_test_platform_supported() == false)
 		{
-			PTS_IS_CLIENT && $report_warnings && pts_client::$display->test_run_error($this->get_identifier() . ' is not supported by this operating system: ' . phodevi::os_under_test());
+			$error = $this->get_identifier() . ' is not supported by this operating system: ' . phodevi::os_under_test();
 			$test_supported = false;
 		}
 		else if($this->is_core_version_supported() == false)
 		{
-			PTS_IS_CLIENT && $report_warnings && pts_client::$display->test_run_error($this->get_identifier() . ' is not supported by this version of the Phoronix Test Suite: ' . PTS_VERSION);
+			$error = $this->get_identifier() . ' is not supported by this version of the Phoronix Test Suite: ' . PTS_VERSION;
 			$test_supported = false;
 		}
 		else if(PTS_IS_CLIENT && ($custom_support_check = $this->custom_test_support_check()) !== true)
 		{
 			// A custom-self-generated error occurred, see code comments in custom_test_support_check()
-			PTS_IS_CLIENT && $report_warnings && is_callable(array(pts_client::$display, 'test_run_error')) && pts_client::$display->test_run_error($this->get_identifier() . ': ' . $custom_support_check);
+			$error = $this->get_identifier() . ': ' . $custom_support_check;
 			$test_supported = false;
 		}
 		else if(PTS_IS_CLIENT)
 		{
 			foreach($this->extended_test_profiles() as $extension)
 			{
-				if($extension->is_supported($report_warnings) == false)
+				if($extension->is_supported($print_warnings, $error) == false)
 				{
 					$test_supported = false;
 					break;
 				}
 			}
+		}
+
+		if($print_warnings && !empty($error) && PTS_IS_CLIENT)
+		{
+			pts_client::$display->test_run_error($error);
 		}
 
 		return $test_supported;
@@ -387,10 +434,6 @@ class pts_test_profile extends pts_test_profile_parser
 
 		return $to_execute;
 	}
-	public function is_test_installed()
-	{
-		return is_file($this->get_install_dir() . 'pts-install.xml');
-	}
 	public function get_test_executable()
 	{
 		$exe = parent::get_test_executable();
@@ -466,7 +509,7 @@ class pts_test_profile extends pts_test_profile_parser
 	public function needs_updated_install()
 	{
 		// Checks if test needs updating
-		return $this->test_installation == false || $this->get_test_profile_version() != $this->test_installation->get_installed_version() || $this->get_installer_checksum() != $this->test_installation->get_installed_checksum() || $this->test_installation->get_system_hash() != phodevi::system_id_string();
+		return ($this->test_installation == false || $this->test_installation->is_installed() == false) || $this->get_test_profile_version() != $this->test_installation->get_installed_version() || $this->get_installer_checksum() != $this->test_installation->get_installed_checksum() || $this->test_installation->get_system_hash() != phodevi::system_id_string();
 	}
 	public function to_json()
 	{

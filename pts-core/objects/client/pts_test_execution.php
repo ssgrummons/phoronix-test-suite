@@ -3,8 +3,8 @@
 /*
 	Phoronix Test Suite
 	URLs: http://www.phoronix.com, http://www.phoronix-test-suite.com/
-	Copyright (C) 2008 - 2021, Phoronix Media
-	Copyright (C) 2008 - 2021, Michael Larabel
+	Copyright (C) 2008 - 2022, Phoronix Media
+	Copyright (C) 2008 - 2022, Michael Larabel
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -22,6 +22,8 @@
 
 class pts_test_execution
 {
+	protected static $test_run_error_collection;
+
 	protected static function test_run_error(&$test_run_manager, &$test_run_request, $error_msg)
 	{
 		$error_obj = array($test_run_manager, $test_run_request, $error_msg);
@@ -33,12 +35,13 @@ class pts_test_execution
 		$error_obj = array($test_run_manager, $test_run_request, $error_msg);
 		pts_module_manager::module_process('__event_run_error', $error_obj);
 		pts_client::$display->test_run_instance_error($error_msg);
+		self::$test_run_error_collection[] = $error_msg;
 	}
 	public static function run_test(&$test_run_manager, &$test_run_request)
 	{
+		self::$test_run_error_collection = array();
 		$test_identifier = $test_run_request->test_profile->get_identifier();
 		$extra_arguments = $test_run_request->get_arguments();
-		$full_output = pts_config::read_bool_config('PhoronixTestSuite/Options/General/FullOutput', 'FALSE');
 
 		// Do the actual test running process
 		$test_directory = $test_run_request->test_profile->get_install_dir();
@@ -70,13 +73,12 @@ class pts_test_execution
 		$execute_binary = $test_run_request->test_profile->get_test_executable();
 		$times_to_run = $test_run_request->test_profile->get_times_to_run();
 		$ignore_runs = $test_run_request->test_profile->get_runs_to_ignore();
-		$ignore_runs_override = getenv('IGNORE_RUNS') ? pts_strings::comma_explode(getenv('IGNORE_RUNS')) : array();
+		$ignore_runs_override = ($ir = pts_env::read('IGNORE_RUNS')) ? pts_strings::comma_explode($ir) : array();
 		$test_type = $test_run_request->test_profile->get_test_hardware_type();
 		$allow_cache_share = $test_run_request->test_profile->allow_cache_share() && $test_run_manager->allow_test_cache_share();
 		$min_length = $test_run_request->test_profile->get_min_length();
 		$max_length = $test_run_request->test_profile->get_max_length();
 		$is_monitoring = false;
-		$error_report = null;
 
 		if($test_run_request->test_profile->get_environment_testing_size() > 1 && ceil(disk_free_space($test_directory) / 1048576) < $test_run_request->test_profile->get_environment_testing_size())
 		{
@@ -87,8 +89,8 @@ class pts_test_execution
 		}
 
 		$to_execute = $test_run_request->test_profile->get_test_executable_dir();
-		$pts_test_arguments = trim($test_run_request->test_profile->get_default_arguments() . ' ' . ($test_run_request->test_profile->get_default_arguments() != null ? str_replace($test_run_request->test_profile->get_default_arguments(), '', $extra_arguments) : $extra_arguments) . ' ' . $test_run_request->test_profile->get_default_post_arguments());
-		$extra_runtime_variables = pts_tests::extra_environmental_variables($test_run_request->test_profile);
+		$pts_test_arguments = trim($test_run_request->test_profile->get_default_arguments() . ' ' . ($test_run_request->test_profile->get_default_arguments() != null && !empty($extra_arguments) ? str_replace($test_run_request->test_profile->get_default_arguments(), '', $extra_arguments) : $extra_arguments) . ' ' . $test_run_request->test_profile->get_default_post_arguments());
+		$extra_runtime_variables = pts_tests::extra_environment_variables($test_run_request->test_profile);
 
 		pts_triggered_system_events::pre_run_reboot_triggered_check($test_run_request->test_profile, $extra_runtime_variables);
 
@@ -105,7 +107,7 @@ class pts_test_execution
 		{
 			$pre_output = pts_tests::call_test_script($test_run_request->test_profile, 'pre', 'Running Pre-Test Script', $pts_test_arguments, $extra_runtime_variables, true);
 
-			if($pre_output != null && (pts_client::is_debug_mode() || $full_output))
+			if($pre_output != null)
 			{
 				pts_client::$display->test_run_instance_output($pre_output);
 			}
@@ -131,10 +133,6 @@ class pts_test_execution
 		if($test_run_request->exec_binary_prepend != null)
 		{
 			$execute_binary_prepend = $test_run_request->exec_binary_prepend;
-		}
-		else if(getenv('EXECUTE_BINARY_PREPEND') != false)
-		{
-				$execute_binary_prepend = getenv('EXECUTE_BINARY_PREPEND') . ' ';
 		}
 
 		if(!$cache_share_present && !$test_run_manager->DEBUG_no_test_execution_just_result_parse && $test_run_request->test_profile->is_root_required())
@@ -238,13 +236,12 @@ class pts_test_execution
 					shell_exec('chmod +x ' . $to_execute . '/' . $execute_binary);
 				}
 
-				$test_prepend = getenv('TEST_EXEC_PREPEND') != null ? getenv('TEST_EXEC_PREPEND') . ' ': null;
+				$test_prepend = pts_env::read('TEST_EXEC_PREPEND') != null ? pts_env::read('TEST_EXEC_PREPEND') . ' ': null;
 				pts_client::$display->test_run_instance_header($test_run_request);
 				sleep(2);
 
 				$host_env = $_SERVER;
 				unset($host_env['argv']);
-				$use_phoroscript = phodevi::is_windows();
 				$to_exec = 'exec';
 				$post_test_args = ' 2>&1';
 				if(phodevi::is_windows())
@@ -255,13 +252,11 @@ class pts_test_execution
 						$to_exec = 'C:\Windows\System32\cmd.exe';
 						$execute_binary_prepend = ' /c ';
 						$execute_binary_prepend_final = '';
-						$use_phoroscript = false;
 						$post_test_args = '';
 					}
-					else if(is_executable('C:\cygwin64\bin\bash.exe') && pts_file_io::file_get_contents_first_line($to_execute . '/' . $execute_binary) != '#PHOROSCRIPT')
+					else if(is_executable('C:\cygwin64\bin\bash.exe'))
 					{
 						$to_exec = 'C:\cygwin64\bin\bash.exe';
-						$use_phoroscript = false;
 						$test_extra_runtime_variables['PATH'] = (isset($test_extra_runtime_variables['PATH']) ? $test_extra_runtime_variables['PATH'] : null) . ';C:\cygwin64\bin';
 					}
 					else
@@ -275,45 +270,35 @@ class pts_test_execution
 				$is_monitoring = pts_test_result_parser::system_monitor_task_check($test_run_request);
 				$test_run_time_start = microtime(true);
 
-				if($use_phoroscript || pts_client::read_env('USE_PHOROSCRIPT_INTERPRETER') != false)
+				$descriptorspec = array(0 => array('pipe', 'r'), 1 => array('pipe', 'w'), 2 => array('pipe', 'w'));
+
+				if($test_prepend != null && pts_client::executable_in_path(trim($test_prepend)))
 				{
-					pts_client::$display->test_run_message('Making use of PhoroScript code path...');
-					$phoroscript = new pts_phoroscript_interpreter($to_execute . '/' . $execute_binary, $test_extra_runtime_variables, $to_execute);
-					$phoroscript->execute_script($pts_test_arguments);
-					$test_result_std_output = null;
+					$to_exec = '';
 				}
-				else
+
+				$terv = $test_extra_runtime_variables;
+				if(phodevi::is_windows())
 				{
-					$descriptorspec = array(0 => array('pipe', 'r'), 1 => array('pipe', 'w'), 2 => array('pipe', 'w'));
-
-					if($test_prepend != null && pts_client::executable_in_path(trim($test_prepend)))
+					foreach($terv as $terv_i => &$value)
 					{
-						$to_exec = '';
-					}
-
-					$terv = $test_extra_runtime_variables;
-					if(phodevi::is_windows())
-					{
-						foreach($terv as $terv_i => &$value)
+						if((is_dir($value) || is_file($value) || $terv_i == 'LOG_FILE') && strpos($value, ' ') !== false)
 						{
-							if((is_dir($value) || is_file($value) || $terv_i == 'LOG_FILE') && strpos($value, ' ') !== false)
-							{
-								$value = '"' . $value . '"';
-							}
+							$value = '"' . $value . '"';
 						}
 					}
+				}
 
-					$test_process = proc_open($test_prepend . $to_exec . ' ' . $execute_binary_prepend . $execute_binary_prepend_final . $execute_binary . ' ' . $pts_test_arguments . $post_test_args, $descriptorspec, $pipes, $to_execute, array_merge($host_env, pts_client::environmental_variables(), $terv));
+				$test_process = proc_open($test_prepend . $to_exec . ' ' . $execute_binary_prepend . $execute_binary_prepend_final . $execute_binary . ' ' . $pts_test_arguments . $post_test_args, $descriptorspec, $pipes, $to_execute, array_merge($host_env, pts_client::environment_variables(), $terv));
 
-					if(is_resource($test_process))
-					{
-						//echo proc_get_status($test_process)['pid'];
-						pts_module_manager::module_process('__test_running', $test_process);
-						$test_result_std_output = stream_get_contents($pipes[1]);
-						fclose($pipes[1]);
-						fclose($pipes[2]);
-						$return_value = proc_close($test_process);
-					}
+				if(is_resource($test_process))
+				{
+					//echo proc_get_status($test_process)['pid'];
+					pts_module_manager::module_process('__test_running', $test_process);
+					$test_result_std_output = stream_get_contents($pipes[1]);
+					fclose($pipes[1]);
+					fclose($pipes[2]);
+					$return_value = proc_close($test_process);
 				}
 
 				$test_run_time = microtime(true) - $test_run_time_start;
@@ -347,33 +332,35 @@ class pts_test_execution
 
 			pts_triggered_system_events::post_run_reboot_triggered_check($test_run_request->test_profile);
 
-			if(!isset($test_result_std_output[10240]) || pts_client::is_debug_mode() || $full_output)
+			if($test_result_std_output != null && !isset($test_result_std_output[10240]))
 			{
 				pts_client::$display->test_run_instance_output($test_result_std_output);
 			}
 
-			if(is_file($test_log_file) && trim($test_result_std_output) == null && (filesize($test_log_file) < 10240 || pts_client::is_debug_mode() || $full_output))
+			if(is_file($test_log_file) && filesize($test_log_file) == 0)
+			{
+				unlink($test_log_file);
+			}
+			if(is_file($test_log_file) && trim($test_result_std_output) == null)
 			{
 				$test_log_file_contents = file_get_contents($test_log_file);
 				pts_client::$display->test_run_instance_output($test_log_file_contents);
 				unset($test_log_file_contents);
 			}
-			$test_run_request->test_result_standard_output = $test_result_std_output;
 
 			if($exit_status_pass == false)
 			{
 				// If the test script writes its exit status to ~/test-exit-status, if it's non-zero the test run failed
 				self::test_run_instance_error($test_run_manager, $test_run_request, 'The test quit with a non-zero exit status.');
-				$error_report = 'The test quit with a non-zero exit status.';
-				if($is_expected_last_run && is_file($test_log_file))
+
+				if($is_expected_last_run)
 				{
-					$scan_log = pts_file_io::file_get_contents($test_log_file);
+					$scan_log = is_file($test_log_file) ? pts_file_io::file_get_contents($test_log_file) : $test_result_std_output;
 					$test_run_error = pts_tests::scan_for_error($scan_log, $test_run_request->test_profile->get_test_executable_dir());
 
 					if($test_run_error)
 					{
 						self::test_run_instance_error($test_run_manager, $test_run_request, 'E: ' . $test_run_error);
-						$error_report = $test_run_error;
 					}
 				}
 			}
@@ -406,16 +393,15 @@ class pts_test_execution
 					if($test_run_time < 2 && $test_run_request->get_estimated_run_time() > 60 && !$restored_from_cache && !$test_run_manager->DEBUG_no_test_execution_just_result_parse)
 					{
 						// If the test ended in less than two seconds, outputted some int, and normally the test takes much longer, then it's likely some invalid run
-						self::test_run_instance_error($test_run_manager, $test_run_request, 'The test run ended quickly.');
-						if($is_expected_last_run && is_file($test_log_file))
+						pts_client::$display->test_run_instance_error('The test run ended quickly.');
+						if($is_expected_last_run)
 						{
-							$scan_log = pts_file_io::file_get_contents($test_log_file);
+							$scan_log = is_file($test_log_file) ? pts_file_io::file_get_contents($test_log_file) : $test_result_std_output;
 							$test_run_error = pts_tests::scan_for_error($scan_log, $test_run_request->test_profile->get_test_executable_dir());
 
 							if($test_run_error)
 							{
 								self::test_run_instance_error($test_run_manager, $test_run_request, 'E: ' . $test_run_error);
-								$error_report = $test_run_error;
 							}
 						}
 					}
@@ -423,15 +409,14 @@ class pts_test_execution
 				else if($test_run_request->test_profile->get_display_format() != 'NO_RESULT')
 				{
 					self::test_run_instance_error($test_run_manager, $test_run_request, 'The test run did not produce a result.');
-					if($is_expected_last_run && is_file($test_log_file))
+					if($is_expected_last_run)
 					{
-						$scan_log = pts_file_io::file_get_contents($test_log_file);
+						$scan_log = is_file($test_log_file) ? pts_file_io::file_get_contents($test_log_file) : $test_result_std_output;
 						$test_run_error = pts_tests::scan_for_error($scan_log, $test_run_request->test_profile->get_test_executable_dir());
 
 						if($test_run_error)
 						{
 							self::test_run_instance_error($test_run_manager, $test_run_request, 'E: ' . $test_run_error);
-							$error_report = $test_run_error;
 						}
 					}
 				}
@@ -466,7 +451,6 @@ class pts_test_execution
 					if($increase_run_count === -1)
 					{
 						self::test_run_error($test_run_manager, $test_run_request, 'This run will not be saved due to noisy result.');
-						$error_report = 'This run will not be saved due to noisy result.';
 						$abort_testing = true;
 					}
 					else if($increase_run_count == true)
@@ -490,7 +474,7 @@ class pts_test_execution
 				{
 					$interim_output = pts_tests::call_test_script($test_run_request->test_profile, 'interim', 'Running Interim Test Script', $pts_test_arguments, $extra_runtime_variables, true);
 
-					if($interim_output != null && (pts_client::is_debug_mode() || $full_output))
+					if($interim_output != null)
 					{
 						pts_client::$display->test_run_instance_output($interim_output);
 					}
@@ -533,7 +517,7 @@ class pts_test_execution
 		{
 			$post_output = pts_tests::call_test_script($test_run_request->test_profile, 'post', 'Running Post-Test Script', $pts_test_arguments, $extra_runtime_variables, true);
 
-			if($post_output != null && (pts_client::is_debug_mode() || $full_output))
+			if($post_output != null)
 			{
 				pts_client::$display->test_run_instance_output($post_output);
 			}
@@ -663,7 +647,7 @@ class pts_test_execution
 				}
 			}
 
-			foreach(pts_client::environmental_variables() as $key => $value)
+			foreach(pts_client::environment_variables() as $key => $value)
 			{
 				if($value === null)
 				{
@@ -672,13 +656,27 @@ class pts_test_execution
 				}
 				$arguments_description = $arguments_description != null ? str_replace('$' . $key, $value, $arguments_description) : '';
 
-				if(!in_array($key, array('VIDEO_MEMORY', 'NUM_CPU_CORES', 'NUM_CPU_JOBS')))
+				if(!empty($extra_arguments) && !in_array($key, array('VIDEO_MEMORY', 'NUM_CPU_CORES', 'NUM_CPU_JOBS')))
 				{
 					$extra_arguments = str_replace('$' . $key, $value, $extra_arguments);
 				}
 			}
 			$sub_tr->set_used_arguments_description($arguments_description);
 			$sub_tr->set_used_arguments($extra_arguments);
+
+			$this_backup_test_log_dir = $test_run_manager->result_file->get_test_log_dir($sub_tr);
+			if($backup_test_log_file && !empty($backup_test_log_dir) && $backup_test_log_dir != $this_backup_test_log_dir && count($toxfer = pts_file_io::glob($backup_test_log_dir . '/*')) > 0)
+			{
+				// If test generated dynamic arguments and such, the backup log file may be different
+				// or in cases where one run generates multiple results...
+				pts_file_io::mkdir($this_backup_test_log_dir);
+				// TODO: come up with way in log viewer to de-duplicate/symlink rather than copy...
+				// there is also the possibility of the original backup_test_log_dir hash not being used so could be removed
+				foreach($toxfer as $bf)
+				{
+					copy($bf, $this_backup_test_log_dir . basename($bf));
+				}
+			}
 		}
 
 		// Result Calculation
@@ -692,7 +690,7 @@ class pts_test_execution
 		{
 			$test_run_request->test_result_buffer = new pts_test_result_buffer();
 			$rid = $test_run_manager->get_results_identifier() != null ? $test_run_manager->get_results_identifier() : 'Result';
-			$test_run_request->test_result_buffer->add_test_result($rid, '', '', pts_test_run_manager::process_json_report_attributes($test_run_request, $error_report), '', '');
+			$test_run_request->test_result_buffer->add_test_result($rid, '', '', pts_test_run_manager::process_json_report_attributes($test_run_request, (!empty(self::$test_run_error_collection) ? implode(' ', self::$test_run_error_collection) : '')), '', '');
 			$test_run_manager->result_file->add_result($test_run_request);
 		}
 
@@ -705,6 +703,7 @@ class pts_test_execution
 		}
 		if($test_run_manager->is_multi_test_stress_run() == false)
 		{
+			$test_run_request->test_profile->test_installation->test_runtime_error_handler($test_run_request, self::$test_run_error_collection);
 			$test_run_request->test_profile->test_installation->save_test_install_metadata();
 			pts_storage_object::add_in_file(PTS_CORE_STORAGE, 'total_testing_time', ($time_test_elapsed / 60));
 		}

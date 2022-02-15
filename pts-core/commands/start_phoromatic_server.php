@@ -137,8 +137,8 @@ class start_phoromatic_server implements pts_option_interface
 		// Just create the logger so now it will flush it out
 		$pts_logger = new pts_logger();
 		$pts_logger->clear_log();
-		echo pts_core::program_title(true) . ' starting Phoromatic Server' . PHP_EOL;
-		$pts_logger->log(pts_core::program_title(true) . ' starting Phoromatic Server on ' . phodevi::read_property('network', 'ip'));
+		echo pts_core::program_title() . ' starting Phoromatic Server' . PHP_EOL;
+		$pts_logger->log(pts_core::program_title() . ' starting Phoromatic Server on ' . phodevi::read_property('network', 'ip'));
 
 		echo 'Phoronix Test Suite User-Data Directory Path: ' . PTS_USER_PATH . PHP_EOL;
 		echo 'Phoronix Test Suite Configuration File: ' . pts_config::get_config_file_location() . PHP_EOL;
@@ -242,7 +242,8 @@ class start_phoromatic_server implements pts_option_interface
 		$pts_logger->log('Starting HTTP process @ http://localhost:' . $web_port);
 
 		// Avahi for zeroconf network discovery support
-		if(pts_config::read_user_config('PhoronixTestSuite/Options/Server/AdvertiseServiceZeroConf', 'TRUE'))
+		$did_avahi = false;
+		if(pts_config::read_bool_config('PhoronixTestSuite/Options/Server/AdvertiseServiceZeroConf', 'TRUE'))
 		{
 			if(is_dir('/etc/avahi/services') && is_writable('/etc/avahi/services'))
 			{
@@ -262,11 +263,12 @@ class start_phoromatic_server implements pts_option_interface
 				$hostname = $hostname == null ? rand(0, 99) : $hostname;
 				$server_launcher .= 'avahi-publish -s phoromatic-server-' . $hostname . ' _http._tcp ' . $web_port . ' "Phoronix Test Suite Phoromatic" > /dev/null 2> /dev/null &' . PHP_EOL;
 				$server_launcher .= 'avahi_publish_pid=$!'. PHP_EOL;
+				$did_avahi = true;
 			}
 		}
 
 		// Zeroconf via OpenBenchmarking.org
-		if(pts_config::read_user_config('PhoronixTestSuite/Options/Server/AdvertiseServiceOpenBenchmarkRelay', 'TRUE') && pts_network::internet_support_available())
+		if(pts_config::read_bool_config('PhoronixTestSuite/Options/Server/AdvertiseServiceOpenBenchmarkRelay', 'TRUE') && pts_network::internet_support_available())
 		{
 			pts_openbenchmarking::make_openbenchmarking_request('phoromatic_server_relay', array('local_ip' => phodevi::read_property('network', 'ip'), 'local_port' => $web_port));
 		}
@@ -294,7 +296,7 @@ class start_phoromatic_server implements pts_option_interface
 		{
 			$server_launcher .= PHP_EOL . 'rm -f /etc/avahi/services/phoromatic-server.service';
 		}
-		else
+		else if($did_avahi)
 		{
 			$server_launcher .= PHP_EOL . 'kill $avahi_publish_pid';
 		}

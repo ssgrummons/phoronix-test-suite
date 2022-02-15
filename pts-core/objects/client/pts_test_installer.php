@@ -22,11 +22,20 @@
 
 class pts_test_installer
 {
+	protected static $install_errors = array();
+
 	protected static function test_install_error($test_run_manager, &$test_run_request, $error_msg)
 	{
 		$error_obj = array($test_run_manager, $test_run_request, $error_msg);
 		pts_module_manager::module_process('__event_run_error', $error_obj);
 		pts_client::$display->test_install_error($error_msg);
+
+		if(!isset(self::$install_errors[$test_run_request->test_profile->get_identifier()]))
+		{
+			self::$install_errors[$test_run_request->test_profile->get_identifier()] = array();
+		}
+
+		self::$install_errors[$test_run_request->test_profile->get_identifier()][] = $error_msg;
 	}
 	public static function standard_install($items_to_install, $force_install = false, $no_prompts = false, $skip_tests_with_missing_dependencies = false)
 	{
@@ -132,7 +141,7 @@ class pts_test_installer
 		// Let the pts_test_install_manager make some estimations, etc...
 		echo PHP_EOL;
 		$test_install_manager->generate_download_file_lists();
-		if(getenv('NO_DOWNLOAD_CACHE') == false)
+		if(pts_env::read('NO_DOWNLOAD_CACHE') == false)
 		{
 			$test_install_manager->check_download_caches_for_files();
 		}
@@ -153,6 +162,7 @@ class pts_test_installer
 
 			pts_triggered_system_events::post_run_reboot_triggered_check($test_install_request->test_profile);
 
+			$install_footnote = null;
 			if($installed)
 			{
 				if(pts_client::do_anonymous_usage_reporting() && $test_install_request->test_profile->test_installation->get_latest_install_time() > 0)
@@ -161,17 +171,31 @@ class pts_test_installer
 					pts_openbenchmarking_client::upload_usage_data('test_install', array($test_install_request, $test_install_request->test_profile->test_installation->get_latest_install_time()));
 				}
 
-				$install_footnote = null;
 				if(is_file($test_install_request->special_environment_vars['INSTALL_FOOTNOTE']))
 				{
 					$install_footnote = pts_file_io::file_get_contents($test_install_request->special_environment_vars['INSTALL_FOOTNOTE']);
 				}
 
-				$test_install_request->test_profile->test_installation->update_install_data($test_install_request->test_profile, $compiler_data, $install_footnote);
-				$test_install_request->test_profile->test_installation->save_test_install_metadata();
 				$test_profiles[] = $test_install_request->test_profile;
 			}
-			else
+
+			// Write the metadata
+			$install_failed = false;
+			if(!$installed)
+			{
+				// Pass any errors to be preserved in the metadata
+				$install_failed = true;
+
+				if(isset(self::$install_errors[$test_install_request->test_profile->get_identifier()]))
+				{
+					$install_failed = self::$install_errors[$test_install_request->test_profile->get_identifier()];
+				}
+			}
+			$test_install_request->test_profile->test_installation->update_install_data($test_install_request->test_profile, $compiler_data, $install_footnote, $install_failed);
+			$test_install_request->test_profile->test_installation->save_test_install_metadata();
+
+
+			if(!$installed)
 			{
 				$tp = pts_openbenchmarking_client::test_profile_newer_minor_version_available($test_install_request->test_profile);
 				if($tp)
@@ -203,7 +227,7 @@ class pts_test_installer
 			}
 		}
 	}
-	public static function only_download_test_files(&$test_profiles, $to_dir = null, $do_file_checks = true)
+	public static function only_download_test_files(&$test_profiles, $to_dir = false, $do_file_checks = true)
 	{
 		// Setup the install manager and add the tests
 		$test_install_manager = new pts_test_install_manager();
@@ -534,9 +558,8 @@ class pts_test_installer
 	}
 	public static function create_compiler_mask(&$test_install_request)
 	{
-		if(getenv('PTS_NO_COMPILER_MASK'))
+		if(pts_env::read('NO_COMPILER_MASK'))
 		{
-			// XXX: Using the compiler-mask causes a number of tests to fail to properly install due to compiler issues with at least PC-BSD 10.0
 			return false;
 		}
 
@@ -547,13 +570,13 @@ class pts_test_installer
 		if($test_install_request === false || in_array('build-utilities', $external_dependencies))
 		{
 			// Handle C/C++ compilers for this external dependency
-			$compilers['CC'] = array(pts_strings::first_in_string(pts_client::read_env('CC'), ' '), 'gcc', 'clang', 'icc', 'pcc');
-			$compilers['CXX'] = array(pts_strings::first_in_string(pts_client::read_env('CXX'), ' '), 'g++', 'clang++', 'cpp');
+			$compilers['CC'] = array(pts_strings::first_in_string(getenv('CC'), ' '), 'gcc', 'clang', 'icc', 'pcc');
+			$compilers['CXX'] = array(pts_strings::first_in_string(getenv('CXX'), ' '), 'g++', 'clang++', 'cpp');
 		}
 		if($test_install_request === false || in_array('fortran-compiler', $external_dependencies))
 		{
 			// Handle Fortran for this external dependency
-			$compilers['F9X'] = array(pts_strings::first_in_string(pts_client::read_env('F9X'), ' '), pts_strings::first_in_string(pts_client::read_env('F95'), ' '), 'gfortran', 'f90', 'f95', 'fortran', 'gfortran9', 'gfortran8', 'gfortran6', 'gfortran6');
+			$compilers['F9X'] = array(pts_strings::first_in_string(getenv('F9X'), ' '), pts_strings::first_in_string(getenv('F95'), ' '), 'gfortran', 'f90', 'f95', 'fortran', 'gfortran9', 'gfortran8', 'gfortran6', 'gfortran6');
 		}
 		if(!pts_client::executable_in_path('python'))
 		{
@@ -577,7 +600,7 @@ class pts_test_installer
 			foreach($possible_compilers as $i => $possible_compiler)
 			{
 				// first check to ensure not null sent to executable_in_path from env variable
-				if($possible_compiler && (($compiler_path = is_executable($possible_compiler)) || ($compiler_path = pts_client::executable_in_path($possible_compiler, 'ccache'))))
+				if($possible_compiler && (($compiler_path = (is_executable($possible_compiler) ? $possible_compiler : false)) || ($compiler_path = pts_client::executable_in_path($possible_compiler, 'ccache'))))
 				{
 					// Replace the array of possible compilers with a string to the detected compiler executable
 					$compilers[$compiler_type] = $compiler_path;
@@ -902,7 +925,6 @@ class pts_test_installer
 					{
 						$install_error = null;
 
-						pts_file_io::unlink($test_install_directory . 'pts-install.xml');
 						pts_file_io::unlink($test_install_directory . 'pts-install.json');
 
 						if($test_install_request->test_profile->test_installation->has_install_log())
@@ -991,7 +1013,7 @@ class pts_test_installer
 		if($remove_old_files && $test_install_request->test_profile->do_remove_test_install_directory_on_reinstall())
 		{
 			// Remove any (old) files that were installed
-			$ignore_files = array('pts-install.xml', 'pts-install.json', 'install-failed.log');
+			$ignore_files = array('pts-install.json', 'install-failed.log');
 			foreach($test_install_request->get_download_objects() as $download_object)
 			{
 				$ignore_files[] = $download_object->get_filename();

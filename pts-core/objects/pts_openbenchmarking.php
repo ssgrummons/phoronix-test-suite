@@ -577,7 +577,11 @@ class pts_openbenchmarking
 		{
 			return true;
 		}
+
 		$file = PTS_OPENBENCHMARKING_SCRATCH_PATH . $qualified_identifier . '.zip';
+		$json_changelog = '';
+		$json_overview = '';
+
 		if(!is_file($file))
 		{
 			$cache_locations = array('/var/cache/phoronix-test-suite/openbenchmarking.org/');
@@ -598,17 +602,29 @@ class pts_openbenchmarking
 		{
 			if(pts_network::internet_support_available())
 			{
-				$hash_json = pts_openbenchmarking::make_openbenchmarking_request('test_hash', array('i' => $qualified_identifier));
-				$hash_json = json_decode($hash_json, true);
-				$hash_check = isset($hash_json['openbenchmarking']['test']['hash']) ? $hash_json['openbenchmarking']['test']['hash'] : null;  // should also check for ['openbenchmarking']['test']['error'] problems
+				$acquire_test_json = pts_openbenchmarking::make_openbenchmarking_request('acquire_test', array('i' => $qualified_identifier));
+				$acquire_test_json = json_decode($acquire_test_json, true);
 
-				$test_profile = pts_openbenchmarking::make_openbenchmarking_request('download_test', array('i' => $qualified_identifier));
-
-				if($test_profile != null && ($hash_check == null || $hash_check == sha1($test_profile)))
+				if(isset($acquire_test_json['openbenchmarking']['test']['sha1_hash']) && isset($acquire_test_json['openbenchmarking']['test']['zip']))
 				{
-					// save it
-					file_put_contents($file, $test_profile);
-					$hash_check = null;
+					$test_profile = base64_decode($acquire_test_json['openbenchmarking']['test']['zip']);
+					$hash_check = $acquire_test_json['openbenchmarking']['test']['sha1_hash'];
+					// TODO should also check for ['openbenchmarking']['test']['error'] to report any problems
+
+					if($test_profile != null &&  $hash_check == sha1($test_profile))
+					{
+						// save it
+						file_put_contents($file, $test_profile);
+
+						if(isset($acquire_test_json['openbenchmarking']['test']['changes']))
+						{
+							$json_changelog = $acquire_test_json['openbenchmarking']['test']['changes'];
+						}
+						if(isset($acquire_test_json['openbenchmarking']['test']['generated']))
+						{
+							$json_overview = $acquire_test_json['openbenchmarking']['test']['generated'];
+						}
+					}
 				}
 			}
 
@@ -644,6 +660,14 @@ class pts_openbenchmarking
 
 			if(is_file(PTS_TEST_PROFILE_PATH . $qualified_identifier . '/test-definition.xml'))
 			{
+				if(!empty($json_changelog))
+				{
+					file_put_contents(PTS_TEST_PROFILE_PATH . $qualified_identifier . '/changelog.json', json_encode($json_changelog));
+				}
+				if(!empty($json_overview))
+				{
+					file_put_contents(PTS_TEST_PROFILE_PATH . $qualified_identifier . '/generated.json', json_encode($json_overview));
+				}
 				return true;
 			}
 			else
@@ -706,7 +730,7 @@ class pts_openbenchmarking
 
 		foreach($archived_servers as $archived_server)
 		{
-			$cache = pts_network::http_get_contents('http://' . $archived_server['ip'] . ':' . $archived_server['http_port'] . '/openbenchmarking-cache.php?' . $type_request . '&repo=' . $repo . '&test=' . $test);
+			$cache = pts_network::http_get_contents($archived_server['protocol'] . '://' . $archived_server['ip'] . ':' . $archived_server['http_port'] . '/openbenchmarking-cache.php?' . $type_request . '&repo=' . $repo . '&test=' . $test);
 
 			if(!empty($cache))
 			{
@@ -839,32 +863,28 @@ class pts_openbenchmarking
 
 		$file = PTS_OPENBENCHMARKING_SCRATCH_PATH . $qualified_identifier . '.zip';
 
-		if(pts_network::internet_support_available())
-		{
-			$hash_json = pts_openbenchmarking::make_openbenchmarking_request('suite_hash', array('i' => $qualified_identifier));
-			$hash_json = json_decode($hash_json, true);
-			$hash_check = isset($hash_json['openbenchmarking']['suite']['hash']) ? $hash_json['openbenchmarking']['suite']['hash'] : null;  // should also check for ['openbenchmarking']['suite']['error'] problems
-		}
-		else
-		{
-			$hash_check = null;
-		}
-
 		if(!is_file($file))
 		{
-			if(pts_network::internet_support_available())
+			if(is_file('/var/cache/phoronix-test-suite/openbenchmarking.org/' . $qualified_identifier . '.zip'))
 			{
-				$test_suite = pts_openbenchmarking::make_openbenchmarking_request('download_suite', array('i' => $qualified_identifier));
+				copy('/var/cache/phoronix-test-suite/openbenchmarking.org/' . $qualified_identifier . '.zip', $file);
+			}
+			else if(pts_network::internet_support_available())
+			{
+				$acquire_suite_json = pts_openbenchmarking::make_openbenchmarking_request('acquire_suite', array('i' => $qualified_identifier));
+				$acquire_suite_json = json_decode($acquire_suite_json, true);
 
-				if($test_suite != null && ($hash_check == null || $hash_check == sha1($test_suite)))
+				if(isset($acquire_suite_json['openbenchmarking']['suite']['sha1_hash']) && isset($acquire_suite_json['openbenchmarking']['suite']['zip']))
 				{
-					// save it
-					file_put_contents($file, $test_suite);
-					$hash_check = null;
-				}
-				else if(is_file('/var/cache/phoronix-test-suite/openbenchmarking.org/' . $qualified_identifier . '.zip') && ($hash_check == null || sha1_file('/var/cache/phoronix-test-suite/openbenchmarking.org/' . $qualified_identifier . '.zip') == $hash_check))
-				{
-					copy('/var/cache/phoronix-test-suite/openbenchmarking.org/' . $qualified_identifier . '.zip', $file);
+					$test_suite = base64_decode($acquire_suite_json['openbenchmarking']['suite']['zip']);
+					$hash_check = $acquire_suite_json['openbenchmarking']['suite']['sha1_hash'];
+					// TODO should also check for ['openbenchmarking']['suite']['error'] to report any problems
+
+					if($test_suite != null &&  $hash_check == sha1($test_suite))
+					{
+						// save it
+						file_put_contents($file, $test_suite);
+					}
 				}
 			}
 
@@ -891,7 +911,7 @@ class pts_openbenchmarking
 			}
 		}
 
-		if(!is_file($download_location . $qualified_identifier . '/suite-definition.xml') && is_file($file) && ($hash_check == null || (is_file($file) && sha1_file($file) == $hash_check)))
+		if(!is_file($download_location . $qualified_identifier . '/suite-definition.xml') && is_file($file))
 		{
 			// extract it
 			pts_file_io::mkdir($download_location . dirname($qualified_identifier));
@@ -1035,10 +1055,10 @@ class pts_openbenchmarking
 
 					if(PTS_IS_CLIENT && pts_client::current_command() == 'pts_test_run_manager')
 					{
-						// Check to see if an older version of the test profile is currently installed to ru nthat since no version specified
+						// Check to see if an older version of the test profile is currently installed to run that since no version specified
 						foreach($available_versions as $i => $v)
 						{
-							if(is_file(pts_client::test_install_root_path() . $repo . '/' . $test . '-' . $v . '/pts-install.xml'))
+							if(is_file(pts_client::test_install_root_path() . $repo . '/' . $test . '-' . $v . '/pts-install.json'))
 							{
 								$version = $v;
 

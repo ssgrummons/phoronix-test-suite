@@ -3,8 +3,8 @@
 /*
 	Phoronix Test Suite
 	URLs: http://www.phoronix.com, http://www.phoronix-test-suite.com/
-	Copyright (C) 2008 - 2016, Phoronix Media
-	Copyright (C) 2008 - 2016, Michael Larabel
+	Copyright (C) 2008 - 2022, Phoronix Media
+	Copyright (C) 2008 - 2022, Michael Larabel
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 	You should have received a copy of the GNU General Public License
 	along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
-
 
 class phoromatic_settings implements pts_webui_interface
 {
@@ -102,15 +101,21 @@ class phoromatic_settings implements pts_webui_interface
 				$result = $stmt->execute();
 				$row = $result->fetchArray();
 
+				$env_vars_show = !empty($row['GlobalEnvironmentVariables']) ? pts_strings::parse_value_string_vars($row['GlobalEnvironmentVariables']) : array();
+
 				$account_settings = array(
 					'Global Settings' => array(
 						'ArchiveResultsLocally' => 'Archive test results on local test systems after the results have been uploaded.',
-						'UploadSystemLogs' => 'Upload system logs when uploading test results.',
+						'UploadSystemLogs' => 'Upload system logs from clients when uploading test results.',
+						'UploadInstallLogs' => 'Upload test installation logs from clients when uploading test results.',
+						'UploadRunLogs' => 'Upload test run-time logs from clients when uploading test results.',
+						'ProgressiveResultUploads' => 'Allow clients to stream results progressively to the Phoromatic Server as tests are finished (the ability to see in-progress result files on the Phoromatic Server rather than waiting until all tests are finished).',
 						'RunInstallCommand' => 'For all test schedules, always run the install command for test(s) prior to running them on the system.',
 						'ForceInstallTests' => 'For all test schedules, force the test installation/re-installation of tests each time prior to running the test.',
-						'SystemSensorMonitoring' => 'Enable the system sensor monitoring while tests are taking place.',
+						//'SystemSensorMonitoring' => 'Enable the system sensor monitoring while tests are taking place.',
 						'UploadResultsToOpenBenchmarking' => 'For all test schedules, also upload test results to OpenBenchmarking.org.',
-						'AllowAnyDataForLogFiles' => 'When clients are uploading system log files to the Phoromatic Server, allow any data (non-text data) to be uploaded rather than enforcing text-only log files.',
+						// AllowAnyDataForLogFiles is enabled by default on PTS 10.8.1+
+						//'AllowAnyDataForLogFiles' => 'When clients are uploading system log files to the Phoromatic Server, allow any data (non-text data) to be uploaded rather than enforcing text-only log files.',
 						'PowerOffWhenDone' => 'Power off system(s) when scheduled tests are completed for the day.',
 						'PreSeedTestInstalls' => 'Attempt to pre-install commonly used tests on client systems while idling.',
 						'NetworkPowerUpWhenNeeded' => 'Use network Wake-On-LAN to power on systems when needed.',
@@ -158,7 +163,29 @@ class phoromatic_settings implements pts_webui_interface
 					$main .= '</p>';
 				}
 
+				if(isset($_POST['env_var_update']))
+				{
+					$env_vars_show = array();
+					$env_vars = array();
+					foreach(pts_env::get_posted_options('phoromatic') as $ei => $ev)
+					{
+						array_push($env_vars, $ei . '=' . $ev);
+						$env_vars_show[$ei] = $ev;
+					}
+					$env_vars = implode(';', $env_vars);
+					$stmt = phoromatic_server::$db->prepare('UPDATE phoromatic_account_settings SET GlobalEnvironmentVariables = :val WHERE AccountID = :account_id');
+					$stmt->bindValue(':account_id', $_SESSION['AccountID']);
+					$stmt->bindValue(':val', $env_vars);
+					$stmt->execute();
+				}
+
 				$main .= '<p><input type="hidden" value="1" name="account_settings_update" /><input type="submit" value="Save Account Settings" /></p>';
+				$main .= '</form>';
+
+				$main .= '<form name="system_form" id="system_form" action="?settings" method="post"><hr />';
+				$main .= '<h2>Global Environment Variable Option Overrides</h2> <p>The below options are for environment variable controls that can be set remotely by the Phoromatic Server for use with Phoromatic clients be on the Phoronix Test Suite 10.8 or newer. See the Phoronix Test Suite documentation for more information on these environment variables. The below options will set the values unconditionally for all test schedules / benchmark tickets. Via the individual test schedules / benchmark tickets the environment variables can be set for that given testing rather than globally.</p>' . pts_env::get_html_options('phoromatic', $env_vars_show);
+
+				$main .= '<p><input type="hidden" value="1" name="env_var_update" /><input type="submit" value="Save Global Override Settings" /></p>';
 				$main .= '</form>';
 			}
 

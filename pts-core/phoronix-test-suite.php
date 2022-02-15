@@ -119,9 +119,9 @@ if(QUICK_START == false)
 	}
 
 	register_shutdown_function(array('pts_client', 'process_shutdown_tasks'));
-	//pcntl_signal(SIGTERM, array('pts_client', 'exit_client'));
+	//pcntl_signal(SIGTERM, ...
 
-	if(pts_client::read_env('PTS_IGNORE_MODULES') == false)
+	if(pts_env::read('PTS_IGNORE_MODULES') == false)
 	{
 		pts_client::module_framework_init(); // Initialize the PTS module system
 	}
@@ -143,7 +143,10 @@ for($i = 2; $i < $argc && isset($argv[$i]); $i++)
 
 if(QUICK_START == false)
 {
-	pts_client::user_agreement_check($sent_command);
+	if(PTS_IS_CLIENT && pts_env::read('PTS_SILENT_MODE') != 1)
+	{
+		pts_external_dependencies::startup_handler();
+	}
 
 	// OpenBenchmarking.org
 	pts_openbenchmarking::refresh_repository_lists();

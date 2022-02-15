@@ -46,6 +46,10 @@ class cpu_temp extends phodevi_sensor
 		{
 			$temp_c = $this->cpu_temp_linux();
 		}
+		else if(phodevi::is_windows())
+		{
+			$temp_c = $this->cpu_temp_windows();
+		}
 
 		return $temp_c;
 	}
@@ -66,6 +70,20 @@ class cpu_temp extends phodevi_sensor
 			}
 		}
 		return $temp_c;
+	}
+	private static function cpu_temp_windows()
+	{
+		$output = trim(shell_exec('powershell -NoProfile (Get-WmiObject MSAcpi_ThermalZoneTemperature -Namespace "root/wmi").CurrentTemperature'));
+		if(!empty($output) && is_numeric($output) && $output > 0)
+		{
+			// Convert to C
+			$output = ($output - 2732) / 10;
+			if($output > 1)
+			{
+				return $output;
+			}
+		}
+			return -1;
 	}
 	private function cpu_temp_bsd()
 	{
@@ -116,7 +134,13 @@ class cpu_temp extends phodevi_sensor
 
 		if($raw_temp == -1)
 		{
+			// Raspberry Pi's Broadcom SoC
 			$raw_temp = phodevi_linux_parser::read_sysfs_node('/sys/class/hwmon/hwmon*/temp*_input', 'POSITIVE_NUMERIC', array('temp1_label' => 'SoC Temperature'));
+		}
+
+		if($raw_temp == -1)
+		{
+			$raw_temp = phodevi_linux_parser::read_sysfs_node('/sys/class/hwmon/hwmon*/temp*_input', 'POSITIVE_NUMERIC', array('name' => 'cpu_thermal'));
 		}
 
 		if($raw_temp == -1)

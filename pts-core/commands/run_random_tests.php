@@ -111,7 +111,7 @@ class run_random_tests implements pts_option_interface
 			{
 				$subsystems_to_test = $limit_test_subsystem;
 				$subsystems_to_avoid = array_diff(pts_types::subsystem_targets(), $subsystems_to_test);
-				pts_client::pts_set_environment_variable('SKIP_TESTING_SUBSYSTEMS', implode(',', $subsystems_to_avoid));
+				pts_env::set('SKIP_TESTING_SUBSYSTEMS', implode(',', $subsystems_to_avoid));
 			}
 
 			if($allow_new_tests_to_be_installed)
@@ -142,7 +142,7 @@ class run_random_tests implements pts_option_interface
 				if($test_run_manager->load_tests_to_run($to_test))
 				{
 					// SETUP
-					$test_run_manager->auto_save_results($title, null, 'Various open-source benchmarks by the ' . pts_core::program_title(true) . '.', true);
+					$test_run_manager->auto_save_results($title, null, 'Various open-source benchmarks by the ' . pts_core::program_title() . '.', true);
 					$test_run_manager->auto_generate_results_identifier();
 					echo PHP_EOL;
 					pts_client::$display->generic_sub_heading(pts_client::cli_just_bold('Result File: ') . $test_run_manager->get_file_name());

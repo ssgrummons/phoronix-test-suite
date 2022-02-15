@@ -30,7 +30,7 @@ error_reporting(E_ALL);
 include('../../pts-core.php');
 pts_core::init();
 
-$environmental_variables = array(
+$environment_variables = array(
 	'aid' => 'ACCOUNT_ID',
 	'sid' => 'SYSTEM_ID',
 	'bid' => 'BENCHMARK_TICKET_ID',
@@ -69,7 +69,7 @@ $environmental_variables = array(
 	'et' => 'ELAPSED_TIME',
 	);
 
-foreach($environmental_variables as $get_var => $to_var)
+foreach($environment_variables as $get_var => $to_var)
 {
 	if(isset($_REQUEST[$get_var]) && !empty($_REQUEST[$get_var]))
 	{
@@ -195,7 +195,7 @@ if(empty($result))
 	$stmt->bindValue(':gsid', $GSID);
 	$stmt->bindValue(':access_ip', $_SERVER['REMOTE_ADDR']);
 	$stmt->bindValue(':local_ip', $LOCAL_IP);
-	$stmt->bindValue(':title', $HOSTNAME);
+	$stmt->bindValue(':title', pts_strings::simple($HOSTNAME));
 	$stmt->bindValue(':current_time', phoromatic_server::current_time());
 	$stmt->bindValue(':machine_self_id', $PTS_MACHINE_SELF_ID);
 	$stmt->bindValue(':core_version', $CLIENT_CORE_VERSION);

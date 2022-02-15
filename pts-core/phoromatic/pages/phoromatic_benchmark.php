@@ -3,8 +3,8 @@
 /*
 	Phoronix Test Suite
 	URLs: http://www.phoronix.com, http://www.phoronix-test-suite.com/
-	Copyright (C) 2015, Phoronix Media
-	Copyright (C) 2015, Michael Larabel
+	Copyright (C) 2015 - 2022, Phoronix Media
+	Copyright (C) 2015 - 2022, Michael Larabel
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 	You should have received a copy of the GNU General Public License
 	along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
-
 
 class phoromatic_benchmark implements pts_webui_interface
 {
@@ -41,6 +40,7 @@ class phoromatic_benchmark implements pts_webui_interface
 			return;
 
 		$is_new = true;
+		$e_schedule = false;
 		if(!empty($PATH[0]) && $PATH[0] == 'all')
 		{
 			$main = '<h1>Past Benchmark Tickets</h1>';
@@ -79,7 +79,7 @@ class phoromatic_benchmark implements pts_webui_interface
 
 			if(!empty($row))
 			{
-				if(isset($_GET['remove']))
+				if(isset($_GET['remove']) && verify_submission_token())
 				{
 					$stmt = phoromatic_server::$db->prepare('DELETE FROM phoromatic_benchmark_tickets WHERE AccountID = :account_id AND TicketID = :ticket_id');
 					$stmt->bindValue(':account_id', $_SESSION['AccountID']);
@@ -87,7 +87,7 @@ class phoromatic_benchmark implements pts_webui_interface
 					$result = $stmt->execute();
 					header('Location: /?benchmark');
 				}
-				else if(isset($_GET['repeat']))
+				else if(isset($_GET['repeat']) && verify_submission_token())
 				{
 					$stmt = phoromatic_server::$db->prepare('UPDATE phoromatic_benchmark_tickets SET TicketIssueTime = :new_ticket_time, State = 1 WHERE AccountID = :account_id AND TicketID = :ticket_id');
 					$stmt->bindValue(':account_id', $_SESSION['AccountID']);
@@ -95,7 +95,7 @@ class phoromatic_benchmark implements pts_webui_interface
 					$stmt->bindValue(':new_ticket_time', time());
 					$result = $stmt->execute();
 				}
-				else if(isset($_GET['disable']))
+				else if(isset($_GET['disable']) && verify_submission_token())
 				{
 					$stmt = phoromatic_server::$db->prepare('UPDATE phoromatic_benchmark_tickets SET State = 0 WHERE AccountID = :account_id AND TicketID = :ticket_id');
 					$stmt->bindValue(':account_id', $_SESSION['AccountID']);
@@ -107,7 +107,7 @@ class phoromatic_benchmark implements pts_webui_interface
 				$main .= '<h1>' . $row['Title'] . '</h1>';
 				$main .= '<h3>' . $row['Description'] . '</h3>';
 				$main .= '<p>This benchmark ticket was created on <strong>' . date('j F Y \a\t H:i', strtotime($row['LastModifiedOn'])) . '</strong> by <strong>' . $row['LastModifiedBy'] . '. The ticket was last issued for testing at ' . date('j F Y \a\t H:i', $row['TicketIssueTime']) . '</strong>.';
-				$main .= '<p> <a href="/?benchmark/' . $PATH[0] . '/&repeat">Repeat Ticket</a> &nbsp; &nbsp; &nbsp; <a href="/?benchmark/' . $PATH[0] . '/&remove">Remove Ticket</a>' . (!isset($_GET['disable']) && $row['State'] > 0 ? ' &nbsp; &nbsp; &nbsp; <a href="/?benchmark/' . $PATH[0] . '/&disable">End Ticket</a>' : null) . '</p>';
+				$main .= '<p> <a href="/?benchmark/' . $PATH[0] . '/&repeat' . append_token_to_url('') . '">Repeat Ticket</a> &nbsp; &nbsp; &nbsp; <a href="/?benchmark/' . $PATH[0] . '/&remove' . append_token_to_url('') . '">Remove Ticket</a>' . (!isset($_GET['disable']) && $row['State'] > 0 ? ' &nbsp; &nbsp; &nbsp; <a href="/?benchmark/' . $PATH[0] . '/&disable' . append_token_to_url('') . '">End Ticket</a>' : null) . '</p>';
 
 				if(!empty($row['RunTargetSystems']))
 				{
@@ -140,7 +140,6 @@ class phoromatic_benchmark implements pts_webui_interface
 				}
 
 				$main .= '</ol>';
-
 				if(!empty($row['EnvironmentVariables']))
 				{
 					$main .= '<hr /><h1>Environment</h1><ol>';
@@ -151,11 +150,10 @@ class phoromatic_benchmark implements pts_webui_interface
 					}
 					$main .= '</ol>';
 				}
-
 				$main .= '<hr /><h1>Ticket Payload</h1>';
 				$main .= '<p>This ticket runs the <strong>' . $row['SuiteToRun'] . '</strong> test suite:</p>';
 				$main .= '<div style="max-height: 400px; overflow-y: scroll;">';
-				$xml_path = phoromatic_server::phoromatic_account_suite_path($_SESSION['AccountID'], $row['SuiteToRun']) . 'suite-definition.xml';
+				$xml_path = phoromatic_server::find_suite_file($_SESSION['AccountID'], $row['SuiteToRun']);
 				if(is_file($xml_path))
 				{
 					$test_suite = new pts_test_suite($xml_path);
@@ -235,7 +233,7 @@ class phoromatic_benchmark implements pts_webui_interface
 					$results = 0;
 					while($test_result_row = $test_result_result->fetchArray())
 					{
-						$main .= '<a onclick=""><li id="result_select_' . $test_result_row['PPRID'] . '"><input type="checkbox" id="result_compare_checkbox_' . $test_result_row['PPRID'] . '" onclick="javascript:phoromatic_checkbox_toggle_result_comparison(\'' . $test_result_row['PPRID'] . '\');" onchange="return false;"></input> <span onclick="javascript:phoromatic_window_redirect(\'?result/' . $test_result_row['PPRID'] . '\');">' . $test_result_row['Title'] . '</span><br /><table><tr><td>' . phoromatic_system_id_to_name($test_result_row['SystemID']) . '</td><td>' . phoromatic_user_friendly_timedate($test_result_row['UploadTime']) .  '</td><td>' . $test_result_row['TimesViewed'] . ' Times Viewed</td></table></li></a>';
+						$main .= '<a onclick=""><li id="result_select_' . $test_result_row['PPRID'] . '"><input type="checkbox" id="result_compare_checkbox_' . $test_result_row['PPRID'] . '" onclick="javascript:phoromatic_checkbox_toggle_result_comparison(\'' . $test_result_row['PPRID'] . '\');" onchange="return false;"></input> <span onclick="javascript:phoromatic_window_redirect(\'?result/' . $test_result_row['PPRID'] . '\');">' . $test_result_row['Title'] . '</span><br /><table><tr><td>' . phoromatic_server::system_id_to_name($test_result_row['SystemID']) . '</td><td>' . phoromatic_server::user_friendly_timedate($test_result_row['UploadTime']) .  '</td><td>' . $test_result_row['TimesViewed'] . ' Times Viewed</td></table></li></a>';
 						$results++;
 
 					}
@@ -305,6 +303,11 @@ class phoromatic_benchmark implements pts_webui_interface
 					array_push($env_vars, 'TOTAL_LOOP_TIME=' . $_POST['TOTAL_LOOP_TIME']);
 				}
 
+				foreach(pts_env::get_posted_options('phoromatic') as $ei => $ev)
+				{
+					array_push($env_vars, $ei . '=' . $ev);
+				}
+
 				$env_vars = implode(';', $env_vars);
 
 				// Add benchmark
@@ -319,7 +322,7 @@ class phoromatic_benchmark implements pts_webui_interface
 				$stmt->bindValue(':state', 1);
 				$stmt->bindValue(':modified_by', $_SESSION['UserName']);
 				$stmt->bindValue(':modified_on', phoromatic_server::current_time());
-				$stmt->bindValue(':public_key', isset($public_key) ? $public_key : null);
+				$stmt->bindValue(':public_key', null); //  isset($public_key) ? $public_key :
 				$stmt->bindValue(':run_target_groups', $run_target_groups);
 				$stmt->bindValue(':run_target_systems', $run_target_systems);
 				$stmt->bindValue(':environment_variables', $env_vars);
@@ -332,11 +335,16 @@ class phoromatic_benchmark implements pts_webui_interface
 				}
 			}
 
-			$main = '
-			<h2>' . ($is_new ? 'Create' : 'Edit') . ' A Benchmark</h2>
+			$main = '<h2>' . ($is_new ? 'Create' : 'Edit') . ' A Benchmark</h2>
 			<p>This page allows you to run a test suite -- consisting of a single or multiple test suites -- on a given set/group of systems right away at their next earliest possibility. This benchmark mode is an alternative to the <a href="?schedules">benchmark schedules</a> for reptitive/routine testing.</p>';
-
-			$local_suites = pts_file_io::glob(phoromatic_server::phoromatic_account_suite_path($_SESSION['AccountID']) . '*/suite-definition.xml');
+			$local_suites = array();
+			foreach(pts_file_io::glob(phoromatic_server::phoromatic_account_suite_path($_SESSION['AccountID']) . '*/suite-definition.xml') as $xml_path)
+			{
+					$id = basename(dirname($xml_path));
+					$test_suite = new pts_test_suite($xml_path);
+					$local_suites[$test_suite->get_title() . ' - ' . $id] = $id;
+			}
+			$official_suites = pts_test_suites::suites_on_disk(false, true);
 
 			if(empty($local_suites))
 			{
@@ -353,14 +361,13 @@ class phoromatic_benchmark implements pts_webui_interface
 				<p><input type="text" name="benchmark_identifier" value="' . (!$is_new ? $e_schedule['Identifier'] : null) . '" /></p>
 				<h3>Test Suite To Run:</h3>
 				<p><a href="?build_suite">Build a suite</a> to add/select more tests to run or <a href="?local_suites">view local suites</a> for more information on a particular suite. A test suite is a set of test profiles to run in a pre-defined manner.</p>';
-				$main .= '<p><select name="suite_to_run">';
-				foreach($local_suites as $xml_path)
+				$main .= '<p><select name="suite_to_run" id="suite_to_run_identifier" onchange="phoromatic_show_basic_suite_details(\'\');">';
+				foreach(array_merge($local_suites, $official_suites) as $title => $id)
 				{
-					$id = basename(dirname($xml_path));
-					$test_suite = new pts_test_suite($xml_path);
-					$main .= '<option value="' . $id . '">' . $test_suite->get_title() . ' - ' . $id . '</option>';
+					$main .= '<option value="' . $id . '">' . $title . '</option>';
 				}
 				$main .= '</select></p>';
+				$main .= '<p><div id="suite_details" style="background: #efefef;"></div></p>';
 				$main .= '<h3>Description:</h3>
 				<p>The description is an optional way to add more details about the intent or objective of this test run.</p>
 				<p><textarea name="benchmark_description" id="benchmark_description" cols="50" rows="3">' . (!$is_new ? $e_schedule['Description'] : null) . '</textarea></p>
@@ -371,7 +378,6 @@ class phoromatic_benchmark implements pts_webui_interface
 				$stmt = phoromatic_server::$db->prepare('SELECT Title, SystemID FROM phoromatic_systems WHERE AccountID = :account_id AND State >= 0 ORDER BY Title ASC');
 				$stmt->bindValue(':account_id', $_SESSION['AccountID']);
 				$result = $stmt->execute();
-
 
 				if(!$is_new)
 				{
@@ -443,15 +449,8 @@ class phoromatic_benchmark implements pts_webui_interface
 					$main .= '<option value="' . $i . '">' . pts_strings::format_time($i, 'MINUTES') . '</option>';
 				}
 				$main .= '</select></p>';
+				$main .= '<p><a id="env_var_options_show" onclick="javascript:document.getElementById(\'env_var_options\').style.display = \'block\'; javascript:document.getElementById(\'env_var_options_show\').style.display = \'none\'; ">Advanced Options</a></p> <div id="env_var_options" style="display: none;"><p>The advanced options require the Phoromatic clients be on the latest Phoronix Test Suite (10.8 or newer / Git). See the Phoronix Test Suite documentation for more information on these environment variables / advanced options.</p>' . pts_env::get_html_options('phoromatic') . '</div>';
 
-		/*		$main .= '<h4>System Monitoring</h4>
-				<p>The Phoronix Test Suite system monitor module allows for select hardware/software sensors to be logged in real-time while running the selected test suite. The supported sensors are then shown within the result file upon the test\'s completion.</p>';
-
-				foreach(phodevi::available_sensors() as $sensor)
-				{
-					$main .= '<input type="checkbox" name="MONITOR" value="' . phodevi::sensor_identifier($sensor) . '" /> ' . phodevi::sensor_name($sensor) . ' &nbsp; ';
-				}
-*/
 				$main .= '<hr /><p align="left"><input name="submit" value="' . ($is_new ? 'Run' : 'Edit') . ' Benchmark" type="submit" onclick="return pts_rmm_validate_schedule();" /></p>
 					</form>';
 			}
