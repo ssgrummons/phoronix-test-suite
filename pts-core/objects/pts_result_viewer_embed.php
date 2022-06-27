@@ -36,6 +36,11 @@ class pts_result_viewer_embed
 	{
 		$this->result_file = &$result_file;
 		$this->result_public_id = $public_id;
+
+		if(isset($_SERVER['REQUEST_URI']) && !empty($_SERVER['REQUEST_URI']))
+		{
+			pts_strings::exit_if_contains_unsafe_data($_SERVER['REQUEST_URI']);
+		}
 	}
 	public function allow_modifying_results($can_modify)
 	{
@@ -300,7 +305,7 @@ class pts_result_viewer_embed
 				if(is_file(PTS_INTERNAL_OB_CACHE . 'test-profiles/' . $result_object->test_profile->get_identifier() . '/test-definition.xml'))
 				{
 					$tp = new pts_test_profile(PTS_INTERNAL_OB_CACHE . 'test-profiles/' . $result_object->test_profile->get_identifier() . '/test-definition.xml');
-					$PAGE .= '<p class="mini">' . $tp->get_description() . ' <a href="https://openbenchmarking.org/test/' . $result_object->test_profile->get_identifier(false) . '"><em class="hide_on_print">Learn more via the OpenBenchmarking.org test page</em></a>.</p>';
+					$PAGE .= '<p class="mini">' . $tp->get_description() . ' <a href="https://openbenchmarking.org/test/' . $result_object->test_profile->get_identifier(false) . '"><em class="hide_on_print">Learn more via the OpenBenchmarking.org test page.</em></a></p>';
 
 				/*	$suites_containing_test = pts_test_suites::suites_containing_test_profile($result_object->test_profile);
 					if(!empty($suites_containing_test))
@@ -860,6 +865,8 @@ class pts_result_viewer_embed
 				$si = $sys->get_identifier();
 				$ppdx = rtrim(base64_encode($si), '=');
 				$ppd = self::check_request_for_var($request, 'ppd_' . $ppdx);
+				$ppd = is_numeric($ppd) && $ppd > 0 ? $ppd : 0;
+
 			$t .= '
 				<div id="table-line-' . $ppdx . '" class="div_table_row">';
 				if($system_count > 1)
@@ -1225,6 +1232,15 @@ class pts_result_viewer_embed
 			$ret = str_replace('_DD_', '.', $ret);
 		}
 
+		foreach(pts_strings::safety_strings_to_reject() as $invalid_string)
+		{
+			if(stripos($ret, $invalid_string) !== false)
+			{
+				echo '<strong>Exited due to invalid input ( ' . $invalid_string . ') attempted:</strong> ' . htmlspecialchars($ret);
+				exit;
+			}
+		}
+
 		return $ret;
 	}
 	public static function process_request_to_attributes(&$request, &$result_file, &$extra_attributes)
@@ -1359,6 +1375,18 @@ class pts_result_viewer_embed
 				}
 			}
 		}
+		if(($rmm = self::check_request_for_var($request, 'rmm')))
+		{
+			if(!is_array($rmm))
+			{
+				$rmm = explode(',', $rmm);
+			}
+
+			foreach($rmm as $rm)
+			{
+				$result_file->remove_run($rm);
+			}
+		}
 
 		if(self::check_request_for_var($request, 'grs'))
 		{
@@ -1466,18 +1494,6 @@ class pts_result_viewer_embed
 		{
 			$extra_attributes['highlight_graph_values'] = explode(',', base64_decode(self::check_request_for_var($request, 'hgv_base64')));
 		}
-		if(($rmm = self::check_request_for_var($request, 'rmm')))
-		{
-			if(!is_array($rmm))
-			{
-				$rmm = explode(',', $rmm);
-			}
-
-			foreach($rmm as $rm)
-			{
-				$result_file->remove_run($rm);
-			}
-		}
 		if(self::check_request_for_var($request, 'scalar'))
 		{
 			$extra_attributes['compact_to_scalar'] = true;
@@ -1531,7 +1547,7 @@ class pts_result_viewer_embed
 	}
 	public static function html_input_field($name, $id, $on_change = null)
 	{
-		return '<input type="text" name="' . $name . '" id="' . $id . '" onclick="" value="' . (isset($_REQUEST[$name]) ? strip_tags($_REQUEST[$name]) : null) . '">';
+		return '<input type="text" name="' . pts_strings::simple($name) . '" id="' . pts_strings::simple($id) . '" onclick="" value="' . (isset($_REQUEST[$name]) ? pts_strings::sanitize(strip_tags($_REQUEST[$name])) : null) . '">';
 	}
 	public static function html_select_menu($name, $id, $on_change, $elements, $use_index = true, $other_attributes = array(), $selected = false)
 	{

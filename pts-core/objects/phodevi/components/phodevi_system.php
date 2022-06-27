@@ -622,6 +622,7 @@ class phodevi_system extends phodevi_device_interface
 				$fc = file_get_contents($vuln);
 				$fc = str_replace('Mitigation: ', 'Mitigation of ', $fc);
 				$fc = str_replace('Speculative Store Bypass', 'SSB', $fc);
+				$fc = str_replace(' + ', ' plus ', $fc);
 				if(!empty($fc))
 				{
 					$security[] = basename($vuln) . ': ' . $fc;
@@ -655,7 +656,11 @@ class phodevi_system extends phodevi_device_interface
 			$mds_tool = microsoft_dependency_handler::file_download_location() . 'mdstool-cli.exe';
 			if(is_file($mds_tool))
 			{
-				$mds_output = preg_replace('#\\x1b[[][^A-Za-z]*[A-Za-z]#', '', shell_exec($mds_tool));
+				$mds_output = shell_exec($mds_tool);
+				if(!empty($mds_output))
+				{
+					$mds_output = preg_replace('#\\x1b[[][^A-Za-z]*[A-Za-z]#', '', $mds_output);
+				}
 				//echo PHP_EOL;
 				foreach(array('__user pointer sanitization: Disabled', 'Retpoline: Full', 'IBPB: Always', 'IBRS: Enabled', 'STIBP: Enabled', 'KPTI Enabled: Yes', 'PTE Inversion: Yes') as $check)
 				{
@@ -1570,6 +1575,7 @@ class phodevi_system extends phodevi_device_interface
 		{
 			// Budgie
 			$desktop_environment = 'Budgie';
+			$desktop_version = pts_strings::last_in_string(trim(shell_exec('budgie-desktop --version 2> /dev/null | grep desktop')));
 		}
 
 		if(!empty($desktop_environment))

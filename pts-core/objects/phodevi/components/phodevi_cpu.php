@@ -266,12 +266,16 @@ class phodevi_cpu extends phodevi_device_interface
 			{
 					$lscpu = substr(phodevi::$vfs->lscpu, $t + strlen('L3 cache:') + 1);
 					$lscpu = substr($lscpu, 0, strpos($lscpu, PHP_EOL));
+					if(!empty($lscpu) && ($x = stripos($lscpu, ' (')) !== false)
+					{
+						$lscpu = substr($lscpu, 0, $x);
+					}
 					$lscpu = trim($lscpu);
 					$cache_size = pts_math::number_with_unit_to_mb($lscpu);
 			}
 			if(empty($cache_size) || !is_numeric($cache_size))
 			{
-				$cache_size = self::cpuinfo_cache_size();
+				$cache_size = pts_math::unit_to_mb(self::cpuinfo_cache_size(), 'K');
 			}
 		}
 		else if(phodevi::is_macos())
@@ -552,10 +556,13 @@ class phodevi_cpu extends phodevi_device_interface
 						}
 						break;
 					default:
-						$info = str_replace(': ', ' ', $info);
+						if(!empty($info))
+						{
+							$info = str_replace(': ', ' ', $info);
+						}
 						break;
 				}
-				if(strpos($info, 'ARM') !== false)
+				if(!empty($info) && strpos($info, 'ARM') !== false)
 				{
 					if(is_dir('/sys/devices/system/exynos-core/') && stripos($info, 'Exynos') === false)
 					{
@@ -739,11 +746,23 @@ class phodevi_cpu extends phodevi_device_interface
 						case '0xd40':
 							$new_info .= ' Neoverse-V1';
 							break;
+						case '0xd41':
+							$new_info .= ' Cortex-A78';
+							break;
+						case '0xd42':
+							$new_info .= ' Cortex-A78E';
+							break;
 						case '0xd44':
 							$new_info .= ' Cortex-X1';
 							break;
+						case '0xd4b':
+							$new_info .= ' Cortex-A78C';
+							break;
 						case '0xd4c':
 							$new_info .= ' Cortex-X1C';
+							break;
+						case '0xd46':
+							$new_info .= ' Cortex-A510';
 							break;
 						case '0xd47':
 							$new_info .= ' Cortex-A710';
@@ -767,6 +786,29 @@ class phodevi_cpu extends phodevi_device_interface
 							$new_info .= ' Cortex-M33';
 							break;
 					}
+				}
+				else if($implementer == '0x61')
+				{
+						$new_info = 'Apple';
+						$part = phodevi_linux_parser::read_cpuinfo_single('CPU part');
+						switch($part)
+						{
+							case '0x022':
+							case '0x023':
+								$new_info .= ' M1';
+								break;
+						}
+				}
+				else if($implementer == '0xc0')
+				{
+						$new_info = 'Ampere';
+						$part = phodevi_linux_parser::read_cpuinfo_single('CPU part');
+						switch($part)
+						{
+							case '0xac3':
+								$new_info .= 'One';
+								break;
+						}
 				}
 
 				if(strpos(phodevi::$vfs->dmesg, 'Ampere eMAG') !== false || stripos(pts_file_io::file_get_contents_if_exists('/sys/devices/virtual/dmi/id/sys_vendor'), 'Ampere') !== false || stripos(pts_file_io::file_get_contents_if_exists('/sys/devices/virtual/dmi/id/bios_vendor'), 'Ampere') !== false)
@@ -1122,6 +1164,7 @@ class phodevi_cpu extends phodevi_device_interface
 				104 => 'Zen 2',
 				113 => 'Zen 2',
 				144 => 'Zen 2',
+				160 => 'Zen 2',
 				),
 			25 => array(
 				0 => 'Zen 3',
@@ -1164,6 +1207,8 @@ class phodevi_cpu extends phodevi_device_interface
 				78 => 'Zen 3',
 				79 => 'Zen 3', // end of Yellow Carp
 				80 => 'Zen 3',
+				96 => 'Zen 4',
+				112 => 'Zen 4',
 				160 => 'Zen 4',
 				161 => 'Zen 4',
 				162 => 'Zen 4',
@@ -1256,6 +1301,8 @@ class phodevi_cpu extends phodevi_device_interface
 				167 => 'Rocket Lake',
 				168 => 'Rocket Lake',
 				183 => 'Raptor Lake',
+				186 => 'Raptor Lake',
+				190 => 'Alder Lake',
 				),
 			15 => array(
 				1 => 'Clarksfield',
@@ -1477,7 +1524,7 @@ class phodevi_cpu extends phodevi_device_interface
 	public static function cpu_cache_size_string()
 	{
 		$cache_size = phodevi::read_property('cpu', 'cache-size');
-		if($cache_size > 1)
+		if($cache_size > 0.1)
 		{
 			$cache_size .= ' MB';
 		}

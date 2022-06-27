@@ -1010,9 +1010,13 @@ class pts_result_file_analyzer
 				continue;
 			}
 
-			$tests_counted++;
 			$winner = $result->get_result_first();
 			$loser = $result->get_result_last();
+
+			if($winner == null || $loser == null)
+			{
+				continue;
+			}
 
 			if(!isset($wins[$winner]))
 			{
@@ -1031,6 +1035,7 @@ class pts_result_file_analyzer
 			{
 				$losses[$loser]++;
 			}
+			$tests_counted++;
 		}
 
 		if(empty($wins) || empty($losses))
@@ -1566,6 +1571,11 @@ class pts_result_file_analyzer
 			{
 				$report[] = 'BAR1 / Visible vRAM Size: ' . $json['bar1-visible-vram'];
 				unset($json['bar1-visible-vram']);
+			}
+			if(isset($json['vbios-version']))
+			{
+				$report[] = 'vBIOS Version: ' . $json['vbios-version'];
+				unset($json['vbios-version']);
 			}
 			$system_attributes['Graphics'][$identifier] = implode(' - ' , $report);
 		}

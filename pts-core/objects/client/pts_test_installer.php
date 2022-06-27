@@ -580,7 +580,7 @@ class pts_test_installer
 		}
 		if(!pts_client::executable_in_path('python'))
 		{
-			$compilers['PY2'] = array('python2', 'python2.7', 'python2.6');
+			//$compilers['PY2'] = array('python2', 'python2.7', 'python2.6');
 		}
 		if(!pts_client::executable_in_path('python3'))
 		{
@@ -633,7 +633,7 @@ class pts_test_installer
 				'CC' => array('safeguard-names' => array('gcc', 'cc'), 'environment-variables' => 'CFLAGS'),
 				'CXX' => array('safeguard-names' => array('g++', 'c++'), 'environment-variables' => 'CXXFLAGS'),
 				'F9X' => array('safeguard-names' => array('gfortran', 'f95'), 'environment-variables' => 'FFLAGS'),
-				'PY2' => array('safeguard-names' => array('python'), 'environment-variables' => ''),
+				//'PY2' => array('safeguard-names' => array('python'), 'environment-variables' => ''),
 				'PY3' => array('safeguard-names' => array('python3'), 'environment-variables' => '')
 				);
 

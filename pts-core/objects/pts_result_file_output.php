@@ -212,7 +212,7 @@ class pts_result_file_output
 
 		foreach($result_file->get_result_objects() as $result_object)
 		{
-			$csv_output .= '"' . $result_object->test_profile->get_title() . $result_object->test_profile->get_app_version() . ' - ' . $result_object->get_arguments_description() . '"' . $delimiter . PHP_EOL;
+			$csv_output .= '"' . $result_object->test_profile->get_title() . ' ' . $result_object->test_profile->get_app_version() . ' - ' . $result_object->get_arguments_description() . '"' . $delimiter . PHP_EOL;
 
 			switch($result_object->test_profile->get_result_proportion())
 			{
@@ -1093,7 +1093,7 @@ class pts_result_file_output
 							break;
 					}
 
-					if($normalize_against != -1)
+					if($normalize_against != -1 && is_numeric($normalize_against) && is_numeric($value))
 					{
 						$extra_rows[0][0] = 'Normalized';
 						$extra_rows[0][$x] = round(($hib ? ($value / $normalize_against) : ($normalize_against / $value)) * 100, 2) . '%';

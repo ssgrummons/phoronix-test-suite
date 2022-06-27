@@ -375,7 +375,7 @@ class pts_client
 			'OS_VERSION' => phodevi::read_property('system', 'os-version'),
 			'OS_ARCH' => phodevi::read_property('system', 'kernel-architecture'),
 			'OS_TYPE' => phodevi::os_under_test(),
-			'CPU_FAMILY' => str_replace(' ', '', strtolower(phodevi::read_property('cpu', 'core-family-name'))),
+			'CPU_FAMILY' => (($family = phodevi::read_property('cpu', 'core-family-name')) != '' ? str_replace(' ', '', strtolower($family)) : ''),
 			'THIS_RUN_TIME' => PTS_INIT_TIME,
 			'DEBUG_REAL_HOME' => pts_core::user_home_directory(),
 			'DEBUG_PATH' => pts_client::get_path(),
@@ -634,6 +634,7 @@ class pts_client
 					'glxinfo',
 					'clinfo',
 					'vulkaninfo',
+					'rocminfo',
 					// 'udisks --dump',
 					//'upower --dump',
 					'dmidecode',
@@ -728,14 +729,32 @@ class pts_client
 				if(($extra_logs_dir = pts_env::read('PTS_EXTRA_SYSTEM_LOGS_DIR')) != false && is_dir($extra_logs_dir))
 				{
 					// Allow extra arbitrary system logs to be collected within PTS_EXTRA_SYSTEM_LOGS_DIR
-					foreach(pts_file_io::glob($extra_logs_dir . '/*') as $extra_log)
+					if(self::$skip_log_file_type_checks)
 					{
-						$extra_log_basename = basename($extra_log);
-
-						// Don't overwrite existing auto-generated system log files + also ensure log file is text and not binary etc payload
-						if(!is_file($system_log_dir . $extra_log_basename) && (self::$skip_log_file_type_checks || pts_file_io::is_text_file($extra_log)))
+						// If not bound to just text file backups, just recursive copy directory
+						pts_client::$pts_logger && pts_client::$pts_logger->log('Recursively backing up PTS_EXTRA_SYSTEM_LOGS_DIR: ' . $extra_logs_dir);
+						pts_file_io::copy($extra_logs_dir, $system_log_dir, true);
+					}
+					else
+					{
+						pts_client::$pts_logger && pts_client::$pts_logger->log('Backing up PTS_EXTRA_SYSTEM_LOGS_DIR: ' . $extra_logs_dir);
+						foreach(pts_file_io::glob($extra_logs_dir . '/*') as $extra_log)
 						{
-							copy($extra_log, $system_log_dir . $extra_log_basename);
+							$extra_log_basename = basename($extra_log);
+
+							// Don't overwrite existing auto-generated system log files + also ensure log file is text and not binary etc payload (unless override)
+							if(!is_file($system_log_dir . $extra_log_basename))
+							{
+								if(self::$skip_log_file_type_checks || pts_file_io::is_text_file($extra_log))
+								{
+									copy($extra_log, $system_log_dir . $extra_log_basename);
+									pts_client::$pts_logger && pts_client::$pts_logger->log('Backing up: ' . $extra_log);
+								}
+								else
+								{
+									pts_client::$pts_logger && pts_client::$pts_logger->log('Ignoring log file due to non-text file / no override: ' . $extra_log);
+								}
+							}
 						}
 					}
 				}
@@ -1765,6 +1784,8 @@ class pts_client
 				'C:\Users\\' . $username . '\AppData\Local\Programs\Python\Python37',
 				'C:\Users\\' . $username . '\AppData\Local\Programs\Python\Python38',
 				'C:\Users\\' . $username . '\AppData\Local\Programs\Python\Python39',
+				'C:\Users\\' . $username . '\AppData\Local\Programs\Python\Python310',
+				'C:\Users\\' . $username . '\AppData\Local\Programs\Python\Python311',
 				'C:\Python27',
 				'C:\Go\bin',
 				'C:\Strawberry\perl\bin',
@@ -1799,7 +1820,8 @@ class pts_client
 		{
 			// Fedora OpenMPI path not often in PATH by default
 			$ds = array('/usr/lib64/openmpi/bin',
-				'/usr/local/mpi/openmpi/bin'
+				'/usr/local/mpi/openmpi/bin',
+				'/usr/lib64/mpi/gcc/openmpi/bin'
 				);
 			foreach($ds as $d)
 			{
